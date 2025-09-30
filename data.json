@@ -1,0 +1,45 @@
+{
+  "coins": {},
+  "bank": {},
+  "last_daily": {},
+  "last_weekly": {},
+  "transactions": {},
+  "active_games": {},
+  "companies": {},
+  "items": {},
+  "inventories": {},
+  "equipped": {},
+  "guilds": {},
+  "guild_members": {},
+  "stock_holdings": {},
+  "stock_prices": {
+    "SORACOIN": 96.58,
+    "LUCKYST": 44.19,
+    "GUILDCO": 74.79,
+    "MINING": 237.95
+  },
+  "consumable_effects": {},
+  "loot_tables": {},
+  "config": {
+    "min_bet": 10,
+    "max_bet": 1000000,
+    "daily_amount": 150,
+    "weekly_amount": 1000,
+    "interest_rate": 0.001,
+    "interest_tick_minutes": 10,
+    "market_tick_minutes": 10,
+    "economy_frozen": false,
+    "rob_cooldown_hours": 1,
+    "rob_success_rate": 0.3,
+    "rob_max_steal_percent": 0.2,
+    "rob_fine_percent": 0.1
+  },
+  "bans": {},
+  "cooldowns": {},
+  "leaderboard_channel": null,
+  "leaderboard_message": null,
+  "_meta": {
+    "last_interest_ts": null,
+    "last_market_ts": "2025-09-30T20:45:40.303081"
+  }
+}
