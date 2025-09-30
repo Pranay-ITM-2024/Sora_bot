@@ -1,6 +1,3 @@
-"""
-Simple Flask web server to keep the bot alive on Render
-"""
 from flask import Flask, jsonify
 import threading
 import time

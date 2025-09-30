@@ -20,76 +20,88 @@ class DataManager:
         
     async def init_database(self):
         """Initialize SQLite database with proper schema"""
-        async with aiosqlite.connect(DATABASE_PATH) as db:
-            # Main data table
-            await db.execute("""
-                CREATE TABLE IF NOT EXISTS bot_data (
-                    key TEXT PRIMARY KEY,
-                    value TEXT,
-                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
+        try:
+            # Ensure database directory exists
+            db_path = Path(DATABASE_PATH)
+            db_path.parent.mkdir(parents=True, exist_ok=True)
             
-            # Individual user data for faster access
-            await db.execute("""
-                CREATE TABLE IF NOT EXISTS user_data (
-                    user_id TEXT PRIMARY KEY,
-                    coins INTEGER DEFAULT 0,
-                    bank INTEGER DEFAULT 0,
-                    inventory TEXT DEFAULT '{}',
-                    equipment TEXT DEFAULT '{}',
-                    stats TEXT DEFAULT '{}',
-                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
-            # Guild data
-            await db.execute("""
-                CREATE TABLE IF NOT EXISTS guild_data (
-                    guild_id TEXT PRIMARY KEY,
-                    name TEXT,
-                    owner_id TEXT,
-                    bank INTEGER DEFAULT 0,
-                    members TEXT DEFAULT '[]',
-                    settings TEXT DEFAULT '{}',
-                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
-            # Stock market data
-            await db.execute("""
-                CREATE TABLE IF NOT EXISTS stock_data (
-                    symbol TEXT PRIMARY KEY,
-                    price REAL,
-                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
-            # Transaction history
-            await db.execute("""
-                CREATE TABLE IF NOT EXISTS transactions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT,
-                    amount INTEGER,
-                    type TEXT,
-                    reason TEXT,
-                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
-            # Backup history table
-            await db.execute("""
-                CREATE TABLE IF NOT EXISTS backup_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    backup_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    data_size INTEGER,
-                    backup_type TEXT,
-                    success BOOLEAN DEFAULT TRUE
-                )
-            """)
-            
-            await db.commit()
-            logging.info("Database initialized successfully")
+            async with aiosqlite.connect(DATABASE_PATH) as db:
+                # Main data table
+                await db.execute("""
+                    CREATE TABLE IF NOT EXISTS bot_data (
+                        key TEXT PRIMARY KEY,
+                        value TEXT,
+                        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                
+                # Individual user data for faster access
+                await db.execute("""
+                    CREATE TABLE IF NOT EXISTS user_data (
+                        user_id TEXT PRIMARY KEY,
+                        coins INTEGER DEFAULT 0,
+                        bank INTEGER DEFAULT 0,
+                        inventory TEXT DEFAULT '{}',
+                        equipment TEXT DEFAULT '{}',
+                        stats TEXT DEFAULT '{}',
+                        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                
+                # Guild data
+                await db.execute("""
+                    CREATE TABLE IF NOT EXISTS guild_data (
+                        guild_id TEXT PRIMARY KEY,
+                        name TEXT,
+                        owner_id TEXT,
+                        bank INTEGER DEFAULT 0,
+                        members TEXT DEFAULT '[]',
+                        settings TEXT DEFAULT '{}',
+                        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                
+                # Stock market data
+                await db.execute("""
+                    CREATE TABLE IF NOT EXISTS stock_data (
+                        symbol TEXT PRIMARY KEY,
+                        price REAL,
+                        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                
+                # Transaction history
+                await db.execute("""
+                    CREATE TABLE IF NOT EXISTS transactions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT,
+                        amount INTEGER,
+                        type TEXT,
+                        reason TEXT,
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                
+                # Backup history table
+                await db.execute("""
+                    CREATE TABLE IF NOT EXISTS backup_history (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        backup_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        data_size INTEGER,
+                        backup_type TEXT,
+                        success BOOLEAN DEFAULT TRUE
+                    )
+                """)
+                
+                await db.commit()
+                logging.info("Database initialized successfully")
+                
+        except Exception as e:
+            logging.error(f"Failed to initialize database: {e}")
+            # Create data.json as fallback
+            default_data = self._get_default_data()
+            await self._save_to_json(default_data)
+            logging.info("Created JSON fallback due to database initialization failure")
 
     async def save_data(self, data):
         """Save data with multi-layer protection"""
@@ -97,8 +109,13 @@ class DataManager:
             try:
                 self.save_count += 1
                 
-                # 1. Save to SQLite database (primary storage)
-                await self._save_to_database(data)
+                # 1. Try to save to SQLite database (primary storage)
+                database_success = False
+                try:
+                    await self._save_to_database(data)
+                    database_success = True
+                except Exception as e:
+                    logging.warning(f"SQLite save failed: {e}, using JSON backup")
                 
                 # 2. Save to JSON file (backup)
                 await self._save_to_json(data)
@@ -159,13 +176,14 @@ class DataManager:
 
     async def _save_to_database(self, data):
         """Save to SQLite database with normalized structure"""
-        async with aiosqlite.connect(DATABASE_PATH) as db:
-            # Save complete data as JSON blob
-            data_json = json.dumps(data, indent=2)
-            await db.execute(
-                "INSERT OR REPLACE INTO bot_data (key, value, last_updated) VALUES (?, ?, ?)",
-                ("main_data", data_json, datetime.now().isoformat())
-            )
+        try:
+            async with aiosqlite.connect(DATABASE_PATH) as db:
+                # Save complete data as JSON blob
+                data_json = json.dumps(data, indent=2)
+                await db.execute(
+                    "INSERT OR REPLACE INTO bot_data (key, value, last_updated) VALUES (?, ?, ?)",
+                    ("main_data", data_json, datetime.now().isoformat())
+                )
             
             # Save individual user data for faster queries
             for user_id, coins in data.get("coins", {}).items():
@@ -197,16 +215,34 @@ class DataManager:
                 """, (symbol, price, datetime.now().isoformat()))
             
             await db.commit()
+                
+        except Exception as e:
+            logging.error(f"Error saving to database: {e}")
+            raise  # Re-raise so save_data can handle fallback
 
     async def _load_from_database(self):
         """Load from SQLite database"""
-        async with aiosqlite.connect(DATABASE_PATH) as db:
-            cursor = await db.execute(
-                "SELECT value FROM bot_data WHERE key = ?",
-                ("main_data",)
-            )
-            row = await cursor.fetchone()
-            return json.loads(row[0]) if row else None
+        try:
+            # Check if database file exists
+            if not Path(DATABASE_PATH).exists():
+                logging.warning(f"Database file {DATABASE_PATH} does not exist")
+                return None
+                
+            async with aiosqlite.connect(DATABASE_PATH) as db:
+                cursor = await db.execute(
+                    "SELECT value FROM bot_data WHERE key = ?",
+                    ("main_data",)
+                )
+                row = await cursor.fetchone()
+                if row and row[0]:
+                    return json.loads(row[0])
+                else:
+                    logging.warning("No main_data found in database")
+                    return None
+                    
+        except Exception as e:
+            logging.error(f"Error loading from database: {e}")
+            return None
 
     async def _save_to_json(self, data):
         """Save to JSON file backup"""
