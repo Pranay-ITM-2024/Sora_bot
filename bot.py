@@ -15,10 +15,21 @@ import aiofiles
 import os
 import math
 import importlib
+import logging
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv('.env')
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('sorabot.log'),
+        logging.StreamHandler()
+    ]
+)
 
 # Bot configuration
 intents = discord.Intents.default()
@@ -140,6 +151,14 @@ class DataManager:
 async def on_ready():
     print(f'{bot.user} has connected to Discord!')
     
+    # Initialize database system
+    try:
+        from bot_modules.database import data_manager
+        await data_manager.init_database()
+        print('✅ Database system initialized successfully')
+    except Exception as e:
+        print(f'❌ Database initialization failed: {e}')
+    
     # Load all bot_modules
     modules = ["economy", "casino", "inventory", "shop", "guild", "market", "leaderboard", "admin", "help"]
     
@@ -148,22 +167,24 @@ async def on_ready():
             module = importlib.import_module(f"bot_modules.{module_name}")
             if hasattr(module, "setup"):
                 await module.setup(bot)
-                print(f'Loaded {module_name} module')
+                print(f'✅ Loaded {module_name} module')
         except Exception as e:
-            print(f'Failed to load {module_name} module: {e}')
+            print(f'❌ Failed to load {module_name} module: {e}')
     
     # Sync slash commands
     try:
         synced = await bot.tree.sync()
-        print(f"Synced {len(synced)} command(s)")
+        print(f"✅ Synced {len(synced)} command(s)")
     except Exception as e:
-        print(f"Failed to sync commands: {e}")
+        print(f"❌ Failed to sync commands: {e}")
     
     # Start background tasks
     if not interest_ticker.is_running():
         interest_ticker.start()
     if not market_ticker.is_running():
         market_ticker.start()
+    
+    print('🚀 SORABOT is fully operational with data protection!')
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -175,38 +196,58 @@ async def on_command_error(ctx, error):
 @tasks.loop(minutes=10)
 async def interest_ticker():
     """Apply bank interest every 10 minutes"""
-    data = await DataManager.load_data()
-    now = datetime.datetime.utcnow()
-    
-    for user_id, amount in data["bank"].items():
-        if amount > 0:
-            interest = int(amount * data["config"]["interest_rate"])
-            data["bank"][user_id] += interest
-    
-    data["_meta"]["last_interest_ts"] = now.isoformat()
-    await DataManager.save_data(data)
+    try:
+        from bot_modules.database import load_data, save_data
+        
+        data = await load_data()
+        now = datetime.datetime.utcnow()
+        
+        interest_applied = 0
+        for user_id, amount in data["bank"].items():
+            if amount > 0:
+                interest = int(amount * data["config"]["interest_rate"])
+                data["bank"][user_id] += interest
+                interest_applied += interest
+        
+        data["_meta"]["last_interest_ts"] = now.isoformat()
+        await save_data(data)
+        
+        if interest_applied > 0:
+            logging.info(f"Applied {interest_applied:,} total interest to bank accounts")
+    except Exception as e:
+        logging.error(f"Interest ticker error: {e}")
 
 @tasks.loop(minutes=10)
 async def market_ticker():
     """Update stock market prices every 10 minutes"""
-    data = await DataManager.load_data()
-    now = datetime.datetime.utcnow()
-    
-    for stock, current_price in data["stock_prices"].items():
-        if stock in STOCK_MARKET:
-            volatility = STOCK_MARKET[stock]["volatility"]
-            change = random.uniform(-volatility, volatility)
-            new_price = max(1, current_price * (1 + change))
-            data["stock_prices"][stock] = round(new_price, 2)
-    
-    data["_meta"]["last_market_ts"] = now.isoformat()
-    await DataManager.save_data(data)
+    try:
+        from bot_modules.database import load_data, save_data
+        
+        data = await load_data()
+        now = datetime.datetime.utcnow()
+        
+        price_changes = {}
+        for stock, current_price in data["stock_prices"].items():
+            if stock in STOCK_MARKET:
+                volatility = STOCK_MARKET[stock]["volatility"]
+                change = random.uniform(-volatility, volatility)
+                new_price = max(1, current_price * (1 + change))
+                data["stock_prices"][stock] = round(new_price, 2)
+                price_changes[stock] = new_price
+        
+        data["_meta"]["last_market_ts"] = now.isoformat()
+        await save_data(data)
+        
+        logging.info(f"Updated stock prices: {list(price_changes.keys())}")
+    except Exception as e:
+        logging.error(f"Market ticker error: {e}")
 
 if __name__ == "__main__":
     # Load bot token from environment variable
-    token = os.getenv('DISCORD_TOKEN')
+    token = os.getenv('DISCORD_TOKEN') or os.getenv('BOT_TOKEN')
     if not token:
-        print("Please set DISCORD_TOKEN environment variable")
+        print("❌ Please set DISCORD_TOKEN or BOT_TOKEN environment variable")
         exit(1)
     
+    print("🚀 Starting SORABOT with advanced data protection...")
     bot.run(token)

@@ -4,23 +4,12 @@ Leaderboard module: leaderboard, richest, topcasino, topguilds with comprehensiv
 import discord
 from discord import app_commands
 from discord.ext import commands
-import json
-import aiofiles
-from pathlib import Path
-import asyncio
 from datetime import datetime
+from .database import load_data, save_data
 
-DATA_PATH = Path(__file__).parent.parent / "data.json"
-_data_lock = asyncio.Lock()
-
-async def load_data():
-    """Load data from JSON file with concurrency protection"""
-    async with _data_lock:
-        try:
-            async with aiofiles.open(DATA_PATH, 'r') as f:
-                return json.loads(await f.read())
-        except:
-            return {}
+async def load_data_compat():
+    """Load data using the new database system"""
+    return await load_data()
 
 def calculate_net_worth(user_id, data):
     """Calculate user's total net worth including all assets"""
@@ -116,7 +105,7 @@ class LeaderboardView(discord.ui.View):
         await self.show_leaderboard(interaction, category)
 
     async def show_leaderboard(self, interaction, category):
-        data = await load_data()
+        data = await load_data_compat()
         
         if category == "💰 Richest Users":
             await self.show_richest_users(interaction, data)
@@ -172,7 +161,7 @@ class LeaderboardView(discord.ui.View):
         else:
             embed.add_field(name="🏆 Leaderboard", value="No users with assets found!", inline=False)
         
-        embed.set_footer(text="💡 Net worth includes cash, bank, stocks, and inventory value!")
+        embed.set_footer(text="💡 Net worth includes cash, bank, stocks, and inventory value! • Data protected by multi-layer backup system")
         
         await interaction.response.edit_message(embed=embed, view=self)
 
@@ -441,7 +430,7 @@ class Leaderboard(commands.Cog):
     @app_commands.command(name="mystats", description="View your detailed statistics and rankings!")
     async def mystats(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
-        data = await load_data()
+        data = await load_data_compat()
         
         stats = get_user_stats(user_id, data)
         
@@ -488,7 +477,7 @@ class Leaderboard(commands.Cog):
 
     @app_commands.command(name="richest", description="Quick view of the richest users!")
     async def richest(self, interaction: discord.Interaction):
-        data = await load_data()
+        data = await load_data_compat()
         
         # Calculate top 5 richest users
         user_net_worths = []
