@@ -1,6 +1,3 @@
-"""
-Advanced data persistence with multiple backup layers and SQLite database
-"""
 import aiosqlite
 import json
 import asyncio

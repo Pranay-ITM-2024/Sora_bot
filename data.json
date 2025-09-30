@@ -13,10 +13,10 @@
   "guild_members": {},
   "stock_holdings": {},
   "stock_prices": {
-    "SORACOIN": 96.58,
-    "LUCKYST": 44.19,
-    "GUILDCO": 74.79,
-    "MINING": 237.95
+    "SORACOIN": 93.48,
+    "LUCKYST": 42.74,
+    "GUILDCO": 76.74,
+    "MINING": 244.76
   },
   "consumable_effects": {},
   "loot_tables": {},
@@ -39,7 +39,7 @@
   "leaderboard_channel": null,
   "leaderboard_message": null,
   "_meta": {
-    "last_interest_ts": "2025-09-30T20:55:27.488845",
-    "last_market_ts": "2025-09-30T20:45:40.303081"
+    "last_interest_ts": "2025-09-30T21:05:27.496433",
+    "last_market_ts": "2025-09-30T21:15:27.489254"
   }
 }
