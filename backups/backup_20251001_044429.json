@@ -312,16 +312,5 @@
     "last_interest_ts": "2025-09-30T18:53:05.318089",
     "last_market_ts": "2025-09-19T11:22:09.890710"
   },
-  "test_18766": "test_value",
-  "test_save_1": "value_1",
-  "test_save_2": "value_2",
-  "test_save_3": "value_3",
-  "test_save_4": "value_4",
-  "test_save_5": "value_5",
-  "test_save_6": "value_6",
-  "test_save_7": "value_7",
-  "test_save_8": "value_8",
-  "test_save_9": "value_9",
-  "test_save_10": "value_10",
-  "test_save_11": "value_11"
+  "test_18766": "test_value"
 }

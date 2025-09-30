@@ -1,22 +1,91 @@
-import aiosqlite
-import json
-import asyncio
-import aiofiles
-import aiohttp
-import os
-from datetime import datetime, timedelta
-from pathlib import Path
+"""
+Database module: Now using advanced JSON backup system instead of problematic SQLite
+For compatibility, this module now wraps the new backup system
+"""
+
+# Import the new robust backup system
+from .backup_system import backup_manager, load_data as backup_load_data, save_data as backup_save_data
 import logging
 
-DATABASE_PATH = "sorabot.db"
-BACKUP_FILE = "data_backup.json"
-DATA_PATH = Path(__file__).parent.parent / "data.json"
-
+# For backward compatibility, expose the same interface
 class DataManager:
+    """Compatibility wrapper for the new backup system"""
+    
     def __init__(self):
-        self._lock = asyncio.Lock()
-        self.backup_webhook = os.getenv("BACKUP_WEBHOOK")  # Discord webhook for backups
-        self.save_count = 0
+        self.backup_manager = backup_manager
+        
+    async def init_database(self):
+        """Initialize the backup system (no more SQLite issues!)"""
+        try:
+            # Test the backup system
+            test_data = await self.backup_manager.load_data()
+            logging.info("✅ Advanced backup system initialized successfully")
+            return True
+        except Exception as e:
+            logging.error(f"Backup system initialization failed: {e}")
+            return False
+    
+    async def save_data(self, data):
+        """Save data using the new backup system"""
+        return await self.backup_manager.save_data(data)
+    
+    async def load_data(self):
+        """Load data using the new backup system"""
+        return await self.backup_manager.load_data()
+
+# Global data manager instance (maintains compatibility)
+data_manager = DataManager()
+
+# Helper functions for backward compatibility
+async def load_data():
+    """Load data using the backup system"""
+    return await backup_load_data()
+
+async def save_data(data):
+    """Save data using the backup system"""
+    return await backup_save_data(data)
+
+# Import the new robust backup system
+from .backup_system import backup_manager, load_data as backup_load_data, save_data as backup_save_data
+import logging
+
+# For backward compatibility, expose the same interface
+class DataManager:
+    """Compatibility wrapper for the new backup system"""
+    
+    def __init__(self):
+        self.backup_manager = backup_manager
+        
+    async def init_database(self):
+        """Initialize the backup system (no more SQLite issues!)"""
+        try:
+            # Test the backup system
+            test_data = await self.backup_manager.load_data()
+            logging.info("✅ Advanced backup system initialized successfully")
+            return True
+        except Exception as e:
+            logging.error(f"Backup system initialization failed: {e}")
+            return False
+    
+    async def save_data(self, data):
+        """Save data using the new backup system"""
+        return await self.backup_manager.save_data(data)
+    
+    async def load_data(self):
+        """Load data using the new backup system"""
+        return await self.backup_manager.load_data()
+
+# Global data manager instance (maintains compatibility)
+data_manager = DataManager()
+
+# Helper functions for backward compatibility
+async def load_data():
+    """Load data using the backup system"""
+    return await backup_load_data()
+
+async def save_data(data):
+    """Save data using the backup system"""
+    return await backup_save_data(data)
         
     async def init_database(self):
         """Initialize SQLite database with proper schema"""
