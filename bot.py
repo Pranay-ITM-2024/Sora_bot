@@ -151,6 +151,15 @@ class DataManager:
 async def on_ready():
     print(f'{bot.user} has connected to Discord!')
     
+    # Start web server for uptime monitoring
+    try:
+        from web_server import start_web_server, update_bot_status
+        start_web_server()
+        update_bot_status("initializing")
+        print('🌐 Web server started for uptime monitoring')
+    except Exception as e:
+        print(f'⚠️ Web server failed to start: {e}')
+    
     # Initialize database system
     try:
         from bot_modules.database import data_manager
@@ -184,7 +193,14 @@ async def on_ready():
     if not market_ticker.is_running():
         market_ticker.start()
     
-    print('🚀 SORABOT is fully operational with data protection!')
+    # Update web server status
+    try:
+        from web_server import update_bot_status
+        update_bot_status("online")
+    except:
+        pass
+    
+    print('🚀 SORABOT is fully operational with data protection and uptime monitoring!')
 
 @bot.event
 async def on_command_error(ctx, error):

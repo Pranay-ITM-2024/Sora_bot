@@ -1,5 +1,5 @@
 services:
-  - type: worker
+  - type: web
     name: sorabot
     env: python
     buildCommand: "pip install -r requirements.txt"
@@ -7,3 +7,6 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+    scaling:
+      minInstances: 1
+      maxInstances: 1
