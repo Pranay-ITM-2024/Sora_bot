@@ -429,6 +429,81 @@ class SellStockModal(discord.ui.Modal):
         
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
+class StockSelectView(discord.ui.View):
+    """Improved dropdown view for stock selection"""
+    
+    def __init__(self, user_id: str, action: str, data: dict):
+        super().__init__(timeout=60)
+        self.user_id = user_id
+        self.action = action
+        self.data = data
+        
+        # Create dropdown with current stock info
+        self._create_dropdown()
+    
+    def _create_dropdown(self):
+        """Create dropdown with live stock prices"""
+        stock_data = get_stock_data()
+        options = []
+        
+        emojis = {
+            "TECH": "💻", "BANK": "🏦", "MINE": "⛏️", "FOOD": "🍔",
+            "ENERGY": "⚡", "HEALTH": "🏥", "AUTO": "🚗", "RETAIL": "🛒"
+        }
+        
+        for symbol, stock_info in stock_data.items():
+            current_price = calculate_stock_price(symbol, self.data)
+            base_price = stock_info["base_price"]
+            change_percent = ((current_price - base_price) / base_price) * 100
+            
+            # Create description with live data
+            description = f"{stock_info['sector']} • ${current_price:.1f} ({change_percent:+.1f}%)"
+            
+            options.append(discord.SelectOption(
+                label=f"{stock_info['name']} ({symbol})",
+                description=description[:100],  # Discord character limit
+                emoji=emojis.get(symbol, "📊"),
+                value=symbol
+            ))
+        
+        select = discord.ui.Select(
+            placeholder="🔍 Select a stock to view details and trade...",
+            min_values=1,
+            max_values=1,
+            options=options
+        )
+        select.callback = self.stock_select
+        self.add_item(select)
+    
+    async def stock_select(self, interaction: discord.Interaction):
+        """Handle stock selection from dropdown"""
+        if str(interaction.user.id) != self.user_id:
+            await interaction.response.send_message("❌ This is not your trading session!", ephemeral=True)
+            return
+            
+        symbol = interaction.data.get('values', [])[0]
+        
+        # For sell action, verify user owns the stock
+        if self.action == "sell":
+            portfolio = self.data.get("stock_portfolios", {}).get(self.user_id, {})
+            
+            if symbol not in portfolio or portfolio[symbol] <= 0:
+                stock_name = get_stock_data()[symbol]['name']
+                await interaction.response.send_message(
+                    f"❌ You don't own any {stock_name} ({symbol}) shares!\n"
+                    f"💡 Use `/buystock` to purchase stocks first.", 
+                    ephemeral=True
+                )
+                return
+        
+        # Create trading view for selected stock
+        view = StockTradingView(self.user_id, symbol)
+        await view.show_stock_info(interaction)
+    
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+
 class Market(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -476,47 +551,109 @@ class Market(commands.Cog):
             stock_list.append(f"{trend_emoji} **{symbol}** - {current_price:.2f} coins\n    {info['name']} • {info['sector']}{position_indicator}")
         
         embed.add_field(name="📋 Available Stocks", value="\n\n".join(stock_list), inline=False)
-        embed.add_field(name="💡 How to Trade", value="Use `/buystock <symbol>` or `/sellstock <symbol>` to trade!", inline=False)
+        embed.add_field(name="💡 How to Trade", value="Use `/buystock` or `/sellstock` with interactive menus to trade!", inline=False)
         embed.set_footer(text="🔄 Prices update in real-time based on market conditions!")
         
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="buystock", description="Buy shares of a stock!")
-    @app_commands.describe(symbol="Stock symbol to buy (e.g., TECH, BANK, MINE)")
-    async def buystock(self, interaction: discord.Interaction, symbol: str):
-        symbol = symbol.upper()
-        stock_data = get_stock_data()
-        
-        if symbol not in stock_data:
-            available = ", ".join(stock_data.keys())
-            await interaction.response.send_message(f"❌ Invalid stock symbol! Available: {available}", ephemeral=True)
-            return
-        
+    @app_commands.command(name="buystock", description="Buy shares using an interactive stock selection menu!")
+    async def buystock(self, interaction: discord.Interaction):
+        """Buy stocks with interactive dropdown selection"""
         user_id = str(interaction.user.id)
-        view = StockTradingView(user_id, symbol)
-        await view.show_stock_info(interaction)
+        data = await load_data()
+        
+        # Create informative embed
+        embed = discord.Embed(
+            title="📈 Buy Stocks",
+            description="Choose a stock from the dropdown menu below to view details and make a purchase:",
+            color=0x00ff00
+        )
+        
+        # Add user's financial info
+        user_coins = data.get('coins', {}).get(user_id, 0)
+        user_bank = data.get('bank', {}).get(user_id, 0)
+        total_funds = user_coins + user_bank
+        
+        embed.add_field(name="💰 Available Funds", value=f"🪙 Wallet: {user_coins:,}\n🏦 Bank: {user_bank:,}\n💎 Total: {total_funds:,}", inline=True)
+        
+        # Show portfolio value if user has stocks
+        portfolio = data.get("stock_portfolios", {}).get(user_id, {})
+        if portfolio:
+            total_value = 0
+            for symbol, shares in portfolio.items():
+                if shares > 0:
+                    current_price = calculate_stock_price(symbol, data)
+                    total_value += shares * current_price
+            
+            embed.add_field(name="📊 Portfolio Value", value=f"💼 {total_value:,.0f} coins", inline=True)
+        
+        embed.add_field(name="💡 Trading Tips", 
+                       value="• Research before investing\n• Diversify your portfolio\n• Buy low, sell high", 
+                       inline=False)
+        
+        embed.set_footer(text="💡 Click the dropdown below to select a stock!")
+        
+        # Create view with live stock data
+        view = StockSelectView(user_id, "buy", data)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-    @app_commands.command(name="sellstock", description="Sell shares of a stock!")
-    @app_commands.describe(symbol="Stock symbol to sell (e.g., TECH, BANK, MINE)")
-    async def sellstock(self, interaction: discord.Interaction, symbol: str):
-        symbol = symbol.upper()
-        stock_data = get_stock_data()
-        
-        if symbol not in stock_data:
-            available = ", ".join(stock_data.keys())
-            await interaction.response.send_message(f"❌ Invalid stock symbol! Available: {available}", ephemeral=True)
-            return
-        
+    @app_commands.command(name="sellstock", description="Sell shares using an interactive stock selection menu!")
+    async def sellstock(self, interaction: discord.Interaction):
+        """Sell stocks with interactive dropdown selection"""
         user_id = str(interaction.user.id)
         data = await load_data()
         portfolio = data.get("stock_portfolios", {}).get(user_id, {})
         
-        if symbol not in portfolio or portfolio[symbol] <= 0:
-            await interaction.response.send_message(f"❌ You don't own any {symbol} shares! Use `/buystock {symbol}` to purchase.", ephemeral=True)
+        # Check if user has any stocks
+        owned_stocks = [(symbol, shares) for symbol, shares in portfolio.items() if shares > 0]
+        
+        if not owned_stocks:
+            embed = discord.Embed(
+                title="📉 No Stocks to Sell",
+                description="You don't own any stocks yet!",
+                color=0xff9900
+            )
+            embed.add_field(name="💡 Get Started", value="Use `/buystock` to purchase stocks first!", inline=False)
+            embed.add_field(name="🔍 View Market", value="Use `/stocks` to see available stocks!", inline=False)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         
-        view = StockTradingView(user_id, symbol)
-        await view.show_stock_info(interaction)
+        # Create informative embed
+        embed = discord.Embed(
+            title="📉 Sell Stocks",
+            description="Choose a stock from the dropdown menu below to view details and sell shares:",
+            color=0xff4444
+        )
+        
+        # Show portfolio overview
+        total_value = 0
+        portfolio_text = ""
+        
+        for symbol, shares in owned_stocks:
+            stock_info = get_stock_data()[symbol]
+            current_price = calculate_stock_price(symbol, data)
+            value = shares * current_price
+            total_value += value
+            
+            # Price change indicator
+            base_price = stock_info["base_price"]
+            change = current_price - base_price
+            change_emoji = "📈" if change > 0 else "📉" if change < 0 else "➡️"
+            
+            portfolio_text += f"{change_emoji} **{symbol}**: {shares} shares • ${value:,.0f}\n"
+        
+        embed.add_field(name="📊 Your Portfolio", value=portfolio_text[:1024], inline=False)
+        embed.add_field(name="💰 Total Value", value=f"💼 {total_value:,.0f} coins", inline=True)
+        
+        embed.add_field(name="💡 Selling Tips", 
+                       value="• Monitor market trends\n• Consider timing\n• Keep some long-term holds", 
+                       inline=False)
+        
+        embed.set_footer(text="💡 Click the dropdown below to select a stock to sell!")
+        
+        # Create view with live stock data
+        view = StockSelectView(user_id, "sell", data)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
     @app_commands.command(name="portfolio", description="View your stock portfolio with performance!")
     async def portfolio(self, interaction: discord.Interaction):
@@ -527,7 +664,7 @@ class Market(commands.Cog):
         
         if not portfolio:
             embed = discord.Embed(title="📊 Your Portfolio", description="You don't own any stocks yet!", color=0x95a5a6)
-            embed.add_field(name="💡 Get Started", value="Use `/stocks` to view available stocks and `/buystock <symbol>` to start investing!", inline=False)
+            embed.add_field(name="💡 Get Started", value="Use `/stocks` to view available stocks and `/buystock` to start investing!", inline=False)
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         
