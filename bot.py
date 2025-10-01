@@ -48,11 +48,11 @@ intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Data persistence configuration
+# Data persistence configuration - AGGRESSIVE MODE
 DATA_FILE = 'data.json'
 BACKUP_DIR = Path('backups')
 EMERGENCY_BACKUP = 'emergency_data.json'
-AUTO_SAVE_INTERVAL = 30  # seconds
+AUTO_SAVE_INTERVAL = 15  # AGGRESSIVE: 15 seconds instead of 30
 
 # Item definitions
 CONSUMABLE_ITEMS = {
@@ -90,14 +90,13 @@ STOCK_MARKET = {
 
 class AdvancedDataManager:
     """
-    Enterprise-level data persistence system with ZERO data loss guarantee
+    AGGRESSIVE DATA PERSISTENCE SYSTEM - ZERO TOLERANCE FOR DATA LOSS
     Features:
-    - Multi-layer backup system (5 layers of protection)
-    - Atomic file operations (prevents corruption)
-    - Auto-save with configurable intervals
-    - Intelligent recovery from multiple backup sources
-    - NO SQLite dependency - pure JSON with bulletproof protection
-    - RENDER-READY: Cloud persistence for ephemeral file systems
+    - IMMEDIATE cloud backup on every change
+    - Multiple local redundancy layers
+    - Forced save on every critical operation
+    - Startup data verification and recovery
+    - RENDER-READY: Bulletproof cloud persistence
     """
     
     def __init__(self):
@@ -112,105 +111,109 @@ class AdvancedDataManager:
         # Detect if running on Render (ephemeral environment)
         self.is_render = os.getenv('RENDER') == 'true' or os.getenv('RENDER_SERVICE_ID') is not None
         
+        # AGGRESSIVE MODE: Always treat as production environment
+        self.aggressive_mode = True
+        
         # Ensure backup directory exists
         self.backup_dir.mkdir(exist_ok=True)
         
         if self.is_render:
-            logging.info("🌥️ RENDER DETECTED: Advanced Data Manager with cloud persistence initialized")
+            logging.info("🌥️ RENDER DETECTED: AGGRESSIVE cloud persistence initialized")
         else:
-            logging.info("🛡️ Advanced Data Manager initialized with 5-layer protection")
+            logging.info("🛡️ AGGRESSIVE Data Manager initialized - ZERO TOLERANCE FOR DATA LOSS")
     
     async def load_data(self):
-        """Load data with comprehensive fallback protection + cloud recovery"""
+        """AGGRESSIVE data loading with comprehensive fallback protection"""
         try:
-            # RENDER PRIORITY: Try cloud sources first if on Render
-            if self.is_render:
-                cloud_data = await render_persistence.load_from_cloud()
-                if cloud_data and self._validate_data(cloud_data):
-                    logging.info("☁️ Data loaded from cloud backup (Render mode)")
-                    self._data_cache = cloud_data
-                    # Save to local for faster access
-                    await self._save_local_only(cloud_data)
-                    return cloud_data
+            loaded_data = None
             
-            # Try primary data file first
-            if os.path.exists(DATA_FILE):
+            # PRIORITY 1: Try cloud sources first if configured
+            if render_persistence.github_token or self.is_render:
+                try:
+                    cloud_data = await render_persistence.load_from_cloud()
+                    if cloud_data and self._validate_data(cloud_data):
+                        logging.info("☁️ PRIORITY RECOVERY: Data loaded from cloud backup")
+                        loaded_data = cloud_data
+                        # Immediately save to all local backups
+                        await self._save_local_redundant(cloud_data)
+                except Exception as e:
+                    logging.error(f"Cloud recovery failed: {e}")
+            
+            # PRIORITY 2: Try primary data file
+            if not loaded_data and os.path.exists(DATA_FILE):
                 try:
                     async with aiofiles.open(DATA_FILE, 'r') as f:
                         data = json.loads(await f.read())
                         if self._validate_data(data):
                             logging.info("✅ Data loaded from primary file")
-                            self._data_cache = data
-                            return data
+                            loaded_data = data
                         else:
                             logging.warning("⚠️ Primary data corrupted, trying backup...")
                 except Exception as e:
                     logging.warning(f"Primary file error: {e}, trying backup...")
             
-            # Fallback 1: Emergency backup
-            if os.path.exists(EMERGENCY_BACKUP):
+            # PRIORITY 3: Emergency backup
+            if not loaded_data and os.path.exists(EMERGENCY_BACKUP):
                 try:
                     async with aiofiles.open(EMERGENCY_BACKUP, 'r') as f:
                         data = json.loads(await f.read())
                         if self._validate_data(data):
                             logging.info("✅ Restored from emergency backup")
-                            await self.save_data(data)  # Restore to primary
-                            return data
+                            loaded_data = data
                 except Exception as e:
                     logging.warning(f"Emergency backup error: {e}")
             
-            # Fallback 2: Latest timestamped backup
-            backup_files = sorted(self.backup_dir.glob('backup_*.json'), 
-                                key=lambda x: x.stat().st_mtime, reverse=True)
-            for backup_file in backup_files[:5]:  # Try last 5 backups
-                try:
-                    async with aiofiles.open(backup_file, 'r') as f:
-                        data = json.loads(await f.read())
-                        if self._validate_data(data):
-                            logging.info(f"✅ Restored from backup: {backup_file.name}")
-                            await self.save_data(data)  # Restore to primary
-                            return data
-                except Exception as e:
-                    logging.warning(f"Backup {backup_file.name} error: {e}")
-                    continue
-            
-            # Fallback 3: Compressed backups
-            compressed_files = sorted(self.backup_dir.glob('backup_compressed_*.json.gz'), 
+            # PRIORITY 4: Latest timestamped backup
+            if not loaded_data:
+                backup_files = sorted(self.backup_dir.glob('backup_*.json'), 
                                     key=lambda x: x.stat().st_mtime, reverse=True)
-            for compressed_file in compressed_files[:3]:
-                try:
-                    with gzip.open(compressed_file, 'rt', encoding='utf-8') as f:
-                        data = json.loads(f.read())
-                        if self._validate_data(data):
-                            logging.info(f"✅ Restored from compressed backup: {compressed_file.name}")
-                            await self.save_data(data)  # Restore to primary
-                            return data
-                except Exception as e:
-                    logging.warning(f"Compressed backup {compressed_file.name} error: {e}")
-                    continue
+                for backup_file in backup_files[:10]:  # Try last 10 backups
+                    try:
+                        async with aiofiles.open(backup_file, 'r') as f:
+                            data = json.loads(await f.read())
+                            if self._validate_data(data):
+                                logging.info(f"✅ Restored from backup: {backup_file.name}")
+                                loaded_data = data
+                                break
+                    except Exception as e:
+                        logging.warning(f"Backup {backup_file.name} error: {e}")
+                        continue
             
-            # Fallback 4: Cloud backup (if not Render or previous cloud load failed)
-            if not self.is_render:
-                cloud_data = await render_persistence.load_from_cloud()
-                if cloud_data and self._validate_data(cloud_data):
-                    logging.info("☁️ Restored from cloud backup")
-                    await self.save_data(cloud_data)
-                    return cloud_data
+            # PRIORITY 5: Compressed backups
+            if not loaded_data:
+                compressed_files = sorted(self.backup_dir.glob('backup_compressed_*.json.gz'), 
+                                        key=lambda x: x.stat().st_mtime, reverse=True)
+                for compressed_file in compressed_files[:5]:
+                    try:
+                        with gzip.open(compressed_file, 'rt', encoding='utf-8') as f:
+                            data = json.loads(f.read())
+                            if self._validate_data(data):
+                                logging.info(f"✅ Restored from compressed backup: {compressed_file.name}")
+                                loaded_data = data
+                                break
+                    except Exception as e:
+                        logging.warning(f"Compressed backup {compressed_file.name} error: {e}")
+                        continue
             
-            # Last resort: Fresh data
-            logging.warning("🆕 All backups failed, starting with fresh data")
-            data = self.get_default_data()
-            await self.save_data(data)
-            return data
+            # LAST RESORT: Fresh data
+            if not loaded_data:
+                logging.warning("🆕 ALL BACKUPS FAILED - Creating fresh data structure")
+                loaded_data = self.get_default_data()
+            
+            # AGGRESSIVE SAVE: Immediately save to all locations
+            self._data_cache = loaded_data.copy()
+            await self.save_data(loaded_data, force=True)
+            
+            return loaded_data
             
         except Exception as e:
-            logging.error(f"❌ Critical data loading error: {e}")
+            logging.error(f"❌ CRITICAL data loading error: {e}")
             data = self.get_default_data()
-            await self.save_data(data)
+            await self.save_data(data, force=True)
             return data
     
     async def save_data(self, data, force=False):
-        """Save data with atomic operations and multiple backup layers + cloud sync"""
+        """AGGRESSIVE save with immediate cloud sync and multiple redundancy"""
         if self._is_saving and not force:
             logging.debug("Save already in progress, skipping...")
             return True
@@ -228,70 +231,58 @@ class AdvancedDataManager:
             data.setdefault("_meta", {})
             data["_meta"]["last_save"] = datetime.datetime.utcnow().isoformat()
             data["_meta"]["save_count"] = self.save_count
-            data["_meta"]["version"] = "3.0_bulletproof_render"
+            data["_meta"]["version"] = "3.0_aggressive_persistence"
             data["_meta"]["render_mode"] = self.is_render
+            data["_meta"]["hostname"] = os.getenv('HOSTNAME', 'unknown')
             
-            # Layer 1: Atomic primary save (prevents corruption)
-            await self._save_local_only(data)
+            # AGGRESSIVE SAVE: Multiple redundant saves
+            await self._save_local_redundant(data)
             
-            # Layer 2-5: Traditional backup layers (if not on Render or for redundancy)
-            if not self.is_render:
-                # Emergency backup
-                try:
-                    shutil.copy2(DATA_FILE, EMERGENCY_BACKUP)
-                except Exception as e:
-                    logging.warning(f"Emergency backup failed: {e}")
-                
-                # Timestamped backup (every 3 saves or significant events)
-                if self.save_count % 3 == 0 or force:
-                    try:
-                        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                        backup_file = self.backup_dir / f"backup_{timestamp}.json"
-                        shutil.copy2(DATA_FILE, backup_file)
-                        logging.debug(f"Created timestamped backup: {backup_file.name}")
-                    except Exception as e:
-                        logging.warning(f"Timestamped backup failed: {e}")
-                    
-                # Compressed backup (every 10 saves)
-                if self.save_count % 10 == 0:
-                    try:
-                        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                        compressed_file = self.backup_dir / f"backup_compressed_{timestamp}.json.gz"
-                        with open(DATA_FILE, 'rb') as f_in:
-                            with gzip.open(compressed_file, 'wb') as f_out:
-                                shutil.copyfileobj(f_in, f_out)
-                        logging.info(f"Created compressed backup: {compressed_file.name}")
-                    except Exception as e:
-                        logging.warning(f"Compressed backup failed: {e}")
-                
-                # Cleanup old backups
-                if self.save_count % 20 == 0:
-                    await self._cleanup_old_backups()
-            
-            # RENDER PRIORITY: Cloud backup (every save on Render, every 5 saves otherwise)
-            should_cloud_sync = (
-                self.is_render or  # Always sync on Render
-                self.save_count % 5 == 0 or  # Every 5 saves on local
-                force or
-                (datetime.datetime.utcnow() - self.last_cloud_sync).total_seconds() > 300  # Every 5 minutes
-            )
-            
-            if should_cloud_sync:
+            # IMMEDIATE CLOUD SYNC: Always sync on aggressive mode
+            if self.aggressive_mode:
                 try:
                     cloud_success = await render_persistence.save_to_cloud(data)
                     if cloud_success:
                         self.last_cloud_sync = datetime.datetime.utcnow()
-                        logging.debug("☁️ Data synchronized to cloud")
+                        logging.info("☁️ IMMEDIATE cloud sync successful")
                     else:
-                        # Only log warning if we have cloud methods configured
-                        if render_persistence.github_token or render_persistence.backup_webhook_url or render_persistence.discord_backup_webhook:
-                            logging.warning("⚠️ Cloud sync failed - check configuration")
+                        logging.warning("⚠️ IMMEDIATE cloud sync failed - retrying...")
+                        # Retry once
+                        await asyncio.sleep(1)
+                        if await render_persistence.save_to_cloud(data):
+                            logging.info("☁️ Cloud sync retry successful")
                         else:
-                            logging.debug("🔕 Cloud sync skipped - no backup methods configured")
+                            logging.error("❌ Cloud sync retry failed")
                 except Exception as e:
                     logging.error(f"Cloud sync error: {e}")
-            else:
-                logging.debug("⏭️ Cloud sync skipped - not due yet")
+            
+            # Traditional backup layers (always create local redundancy)
+            try:
+                # Emergency backup
+                shutil.copy2(DATA_FILE, EMERGENCY_BACKUP)
+                
+                # Force timestamped backup on every save in aggressive mode
+                if self.aggressive_mode or self.save_count % 2 == 0 or force:
+                    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    backup_file = self.backup_dir / f"backup_{timestamp}.json"
+                    shutil.copy2(DATA_FILE, backup_file)
+                    logging.debug(f"Created timestamped backup: {backup_file.name}")
+                
+                # Compressed backup (every 5 saves in aggressive mode)
+                if self.save_count % 5 == 0:
+                    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    compressed_file = self.backup_dir / f"backup_compressed_{timestamp}.json.gz"
+                    with open(DATA_FILE, 'rb') as f_in:
+                        with gzip.open(compressed_file, 'wb') as f_out:
+                            shutil.copyfileobj(f_in, f_out)
+                    logging.info(f"Created compressed backup: {compressed_file.name}")
+                
+                # Cleanup old backups
+                if self.save_count % 50 == 0:
+                    await self._cleanup_old_backups()
+                    
+            except Exception as e:
+                logging.warning(f"Local backup error: {e}")
             
             # Update cache and log success
             self._data_cache = data.copy()
@@ -301,14 +292,14 @@ class AdvancedDataManager:
             total_coins = sum(data.get("coins", {}).values())
             
             if self.is_render:
-                logging.info(f"☁️ Data saved (#{self.save_count}) - {user_count} users, {total_coins:,} coins [RENDER MODE]")
+                logging.info(f"☁️ AGGRESSIVE SAVE #{self.save_count} - {user_count} users, {total_coins:,} coins [RENDER MODE]")
             else:
-                logging.info(f"💾 Data saved (#{self.save_count}) - {user_count} users, {total_coins:,} coins")
+                logging.info(f"�️ AGGRESSIVE SAVE #{self.save_count} - {user_count} users, {total_coins:,} coins")
             
             return True
             
         except Exception as e:
-            logging.error(f"❌ Critical save error: {e}")
+            logging.error(f"❌ CRITICAL save error: {e}")
             # Emergency save to alternative location
             try:
                 emergency_file = f"CRITICAL_BACKUP_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
@@ -317,7 +308,7 @@ class AdvancedDataManager:
                 logging.error(f"🚨 Emergency backup saved to {emergency_file}")
                 
                 # Try to save to cloud as last resort
-                if self.is_render:
+                if self.is_render or self.aggressive_mode:
                     await render_persistence.save_to_cloud(data)
                     
             except Exception as e2:
@@ -326,22 +317,32 @@ class AdvancedDataManager:
         finally:
             self._is_saving = False
     
-    async def _save_local_only(self, data):
-        """Save data locally with atomic operations"""
+    async def _save_local_redundant(self, data):
+        """Save data to multiple local locations with redundancy"""
+        # Primary atomic save
         temp_file = f"{DATA_FILE}.tmp"
         async with aiofiles.open(temp_file, 'w') as f:
             await f.write(json.dumps(data, indent=2, default=str))
-        
-        # Atomic rename (guarantees no corruption)
         os.rename(temp_file, DATA_FILE)
+        
+        # Immediate secondary save
+        secondary_file = f"{DATA_FILE}.backup"
+        async with aiofiles.open(secondary_file, 'w') as f:
+            await f.write(json.dumps(data, indent=2, default=str))
+        
+        # Immediate tertiary save
+        tertiary_file = f"{DATA_FILE}.redundant"
+        async with aiofiles.open(tertiary_file, 'w') as f:
+            await f.write(json.dumps(data, indent=2, default=str))
     
     async def auto_save_if_needed(self, data):
-        """Auto-save if enough time has passed since last save"""
+        """AGGRESSIVE auto-save - much more frequent saves"""
         now = datetime.datetime.utcnow()
         time_since_save = (now - self.last_save_time).total_seconds()
         
-        if time_since_save >= AUTO_SAVE_INTERVAL:
-            await self.save_data(data)
+        # AGGRESSIVE: Save every 15 seconds instead of 30
+        if time_since_save >= 15 or self.aggressive_mode:
+            await self.save_data(data, force=True)
     
     def _validate_data(self, data):
         """Validate data structure integrity"""
@@ -475,7 +476,15 @@ async def on_ready():
     try:
         # Test load data to ensure system is working
         test_data = await data_manager.load_data()
-        logging.info(f'✅ Advanced data system initialized - {len(test_data.get("coins", {}))} users loaded')
+        logging.info(f'✅ AGGRESSIVE data system initialized - {len(test_data.get("coins", {}))} users loaded')
+        
+        # Link the data manager to bot modules for aggressive saving
+        try:
+            from bot_modules.database import set_data_manager
+            set_data_manager(data_manager)
+        except Exception as e:
+            logging.warning(f"Could not link data manager to modules: {e}")
+            
     except Exception as e:
         logging.error(f'❌ Data system initialization failed: {e}')
     
@@ -498,7 +507,7 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Failed to sync commands: {e}")
     
-    # Start background tasks for economic system and data protection
+    # Start background tasks for economic system and AGGRESSIVE data protection
     if not interest_ticker.is_running():
         interest_ticker.start()
         logging.info("💰 Interest ticker started")
@@ -509,12 +518,17 @@ async def on_ready():
     
     if not data_protection_ticker.is_running():
         data_protection_ticker.start()
-        logging.info("🛡️ Data protection ticker started")
+        logging.info("🛡️ AGGRESSIVE data protection ticker started")
     
     # Start cloud health monitoring on Render
     if data_manager.is_render and not cloud_health_check.is_running():
         cloud_health_check.start()
         logging.info("☁️ Cloud health monitoring started")
+    
+    # Start data verification task
+    if not data_verification_ticker.is_running():
+        data_verification_ticker.start()
+        logging.info("🔍 Data verification ticker started")
     
     # Update web server status
     try:
@@ -642,50 +656,88 @@ async def market_ticker():
     except Exception as e:
         logging.error(f"Market ticker error: {e}")
 
-@tasks.loop(minutes=5)
+@tasks.loop(minutes=2)
 async def data_protection_ticker():
-    """Background data protection and auto-save system with cloud sync"""
+    """AGGRESSIVE data protection - every 2 minutes instead of 5"""
     try:
         # Load current data
         data = await data_manager.load_data()
         
-        # Auto-save if needed (based on time interval)
+        # AGGRESSIVE auto-save check
         await data_manager.auto_save_if_needed(data)
         
-        # Create hourly backup (if not on Render)
+        # Create frequent backups
         now = datetime.datetime.utcnow()
-        if now.minute < 5 and not data_manager.is_render:  # First 5 minutes of every hour
-            await data_manager.create_manual_backup("hourly")
+        if now.minute % 10 == 0 and not data_manager.is_render:  # Every 10 minutes
+            await data_manager.create_manual_backup("scheduled")
         
-        # RENDER: Force cloud sync every 10 minutes
-        if data_manager.is_render and now.minute % 10 == 0:
+        # RENDER: Force cloud sync every 5 minutes
+        if data_manager.is_render and now.minute % 5 == 0:
             try:
                 await render_persistence.save_to_cloud(data)
-                logging.info("☁️ Scheduled cloud sync completed")
+                logging.info("☁️ AGGRESSIVE cloud sync completed")
             except Exception as e:
-                logging.error(f"Scheduled cloud sync failed: {e}")
+                logging.error(f"AGGRESSIVE cloud sync failed: {e}")
         
     except Exception as e:
         logging.error(f"Data protection ticker error: {e}")
 
-@tasks.loop(minutes=15)
+@tasks.loop(minutes=10)
 async def cloud_health_check():
-    """Monitor cloud backup health and connectivity"""
+    """Monitor cloud backup health and connectivity - more frequent"""
     if not data_manager.is_render:
         return  # Only run on Render
     
     try:
-        # Test cloud connectivity
-        test_data = {"health_check": datetime.datetime.utcnow().isoformat()}
-        success = await render_persistence.save_to_cloud(test_data)
+        # Test cloud connectivity with real data
+        data = await data_manager.load_data()
+        success = await render_persistence.save_to_cloud(data)
         
         if success:
             logging.info("☁️ Cloud backup health check: HEALTHY")
         else:
-            logging.warning("⚠️ Cloud backup health check: DEGRADED")
+            logging.warning("⚠️ Cloud backup health check: DEGRADED - ATTEMPTING RECOVERY")
+            # Try to recover cloud connectivity
+            await asyncio.sleep(5)
+            retry_success = await render_persistence.save_to_cloud(data)
+            if retry_success:
+                logging.info("☁️ Cloud backup recovery: SUCCESS")
+            else:
+                logging.error("❌ Cloud backup recovery: FAILED")
             
     except Exception as e:
         logging.error(f"Cloud health check failed: {e}")
+
+# NEW: Data verification task
+@tasks.loop(minutes=15)
+async def data_verification_ticker():
+    """Verify data integrity and force save if needed"""
+    try:
+        data = await data_manager.load_data()
+        
+        # Verify data structure
+        if not data_manager._validate_data(data):
+            logging.error("❌ Data integrity check FAILED - attempting recovery")
+            # Try to recover from backups
+            backup_files = sorted(data_manager.backup_dir.glob('backup_*.json'), 
+                                key=lambda x: x.stat().st_mtime, reverse=True)
+            for backup_file in backup_files[:3]:
+                try:
+                    async with aiofiles.open(backup_file, 'r') as f:
+                        backup_data = json.loads(await f.read())
+                        if data_manager._validate_data(backup_data):
+                            logging.info(f"✅ Data recovered from {backup_file.name}")
+                            await data_manager.save_data(backup_data, force=True)
+                            break
+                except Exception as e:
+                    continue
+        else:
+            logging.debug("✅ Data integrity check passed")
+            # Force save to ensure cloud sync
+            await data_manager.save_data(data, force=True)
+        
+    except Exception as e:
+        logging.error(f"Data verification error: {e}")
 
 if __name__ == "__main__":
     # Load bot token from environment variable
