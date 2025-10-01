@@ -7,6 +7,31 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: RENDER
+        value: true
+      # Discord Bot Token (REQUIRED)
+      - key: DISCORD_TOKEN
+        sync: false  # Set this in Render dashboard
+      
+      # GitHub Token for Gist backups (RECOMMENDED for data persistence)
+      - key: GITHUB_TOKEN
+        sync: false  # Create at https://github.com/settings/tokens
+      
+      # Optional: Webhook for external backup storage
+      - key: BACKUP_WEBHOOK_URL
+        sync: false  # Your external backup service URL
+      
+      # Optional: Discord webhook for emergency backups
+      - key: DISCORD_BACKUP_WEBHOOK
+        sync: false  # Discord webhook URL for backup notifications
+      
+      # Optional: Existing Gist ID (auto-created if not provided)
+      - key: GIST_ID
+        sync: false  # Will be auto-generated if not set
+    
     scaling:
       minInstances: 1
       maxInstances: 1
+    
+    # Health check endpoint
+    healthCheckPath: /health
