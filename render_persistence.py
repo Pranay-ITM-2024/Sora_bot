@@ -36,26 +36,63 @@ class RenderDataPersistence:
         if self.gist_id:
             self.backup_sources.append(f"https://gist.githubusercontent.com/{self.gist_id}/raw/sorabot_data.json")
         
+        # Log configuration status
+        if self.github_token:
+            logging.info("☁️ GitHub token configured - cloud backups enabled")
+        else:
+            logging.warning("⚠️ No GitHub token found - cloud backups disabled")
+            logging.info("💡 To enable cloud backups, set GITHUB_TOKEN environment variable")
+            logging.info("💡 Get token at: https://github.com/settings/tokens (with 'gist' scope)")
+        
+        if self.backup_webhook_url:
+            logging.info("🔗 Backup webhook configured")
+        
+        if self.discord_backup_webhook:
+            logging.info("💬 Discord backup webhook configured")
+        
         logging.info("🌥️ Render data persistence initialized")
     
     async def save_to_cloud(self, data: Dict[str, Any]) -> bool:
         """Save data to multiple cloud sources"""
+        if not self.github_token and not self.backup_webhook_url and not self.discord_backup_webhook:
+            logging.debug("🔕 No cloud backup methods configured - skipping cloud sync")
+            return False
+        
         success_count = 0
+        total_attempts = 0
         
         # Method 1: GitHub Gist (most reliable)
-        if await self._save_to_gist(data):
-            success_count += 1
-            logging.info("✅ Data saved to GitHub Gist")
+        if self.github_token:
+            total_attempts += 1
+            if await self._save_to_gist(data):
+                success_count += 1
+                logging.debug("✅ Data saved to GitHub Gist")
+            else:
+                logging.warning("❌ GitHub Gist backup failed")
         
         # Method 2: Webhook backup
-        if await self._save_to_webhook(data):
-            success_count += 1
-            logging.info("✅ Data saved to webhook backup")
+        if self.backup_webhook_url:
+            total_attempts += 1
+            if await self._save_to_webhook(data):
+                success_count += 1
+                logging.debug("✅ Data saved to webhook backup")
+            else:
+                logging.warning("❌ Webhook backup failed")
         
         # Method 3: Discord webhook (emergency backup)
-        if await self._save_to_discord(data):
-            success_count += 1
-            logging.info("✅ Data saved to Discord backup")
+        if self.discord_backup_webhook:
+            total_attempts += 1
+            if await self._save_to_discord(data):
+                success_count += 1
+                logging.debug("✅ Data saved to Discord backup")
+            else:
+                logging.warning("❌ Discord backup failed")
+        
+        # Log overall result
+        if success_count > 0:
+            logging.info(f"☁️ Cloud sync: {success_count}/{total_attempts} methods successful")
+        elif total_attempts > 0:
+            logging.warning(f"⚠️ Cloud sync failed: 0/{total_attempts} methods successful")
         
         return success_count > 0
     
@@ -87,6 +124,7 @@ class RenderDataPersistence:
     async def _save_to_gist(self, data: Dict[str, Any]) -> bool:
         """Save data to GitHub Gist"""
         if not self.github_token:
+            logging.debug("🔕 No GitHub token - skipping Gist backup")
             return False
         
         try:
@@ -128,6 +166,9 @@ class RenderDataPersistence:
                     async with session.patch(url, headers=headers, json=gist_data) as response:
                         if response.status == 200:
                             return True
+                        else:
+                            logging.error(f"Gist update failed: HTTP {response.status}")
+                            return False
                 else:
                     # Create new gist
                     url = "https://api.github.com/gists"
@@ -136,10 +177,16 @@ class RenderDataPersistence:
                             result = await response.json()
                             self.gist_id = result['id']
                             logging.info(f"📝 Created new Gist: {self.gist_id}")
+                            logging.info("💡 Save this Gist ID as GIST_ID environment variable for faster recovery")
                             return True
+                        else:
+                            logging.error(f"Gist creation failed: HTTP {response.status}")
+                            return False
                         
+        except aiohttp.ClientError as e:
+            logging.error(f"GitHub API connection error: {e}")
         except Exception as e:
-            logging.error(f"Gist backup failed: {e}")
+            logging.error(f"Gist backup error: {e}")
         
         return False
     

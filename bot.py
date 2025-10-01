@@ -37,6 +37,9 @@ logging.basicConfig(
     ]
 )
 
+# Suppress PyNaCl warning for economy bot (voice not needed)
+logging.getLogger('discord.client').setLevel(logging.ERROR)
+
 # Bot configuration
 intents = discord.Intents.default()
 intents.message_content = True
@@ -275,13 +278,20 @@ class AdvancedDataManager:
             
             if should_cloud_sync:
                 try:
-                    if await render_persistence.save_to_cloud(data):
+                    cloud_success = await render_persistence.save_to_cloud(data)
+                    if cloud_success:
                         self.last_cloud_sync = datetime.datetime.utcnow()
-                        logging.info("☁️ Data synchronized to cloud")
+                        logging.debug("☁️ Data synchronized to cloud")
                     else:
-                        logging.warning("⚠️ Cloud sync failed")
+                        # Only log warning if we have cloud methods configured
+                        if render_persistence.github_token or render_persistence.backup_webhook_url or render_persistence.discord_backup_webhook:
+                            logging.warning("⚠️ Cloud sync failed - check configuration")
+                        else:
+                            logging.debug("🔕 Cloud sync skipped - no backup methods configured")
                 except Exception as e:
                     logging.error(f"Cloud sync error: {e}")
+            else:
+                logging.debug("⏭️ Cloud sync skipped - not due yet")
             
             # Update cache and log success
             self._data_cache = data.copy()
