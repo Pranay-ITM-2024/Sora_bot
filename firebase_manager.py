@@ -159,13 +159,13 @@ class FirebaseDataManager:
             logging.error(f"🔥 Migration error: {e}")
             return False
 
-# Create global instance but don't initialize yet
-firebase_manager = None
+# Global instance with lazy initialization
+_firebase_manager = None
 
 def get_firebase_manager():
     """Get Firebase manager instance (lazy initialization)"""
-    global firebase_manager
-    if firebase_manager is None:
-        firebase_manager = FirebaseDataManager()
-        firebase_manager.initialize_firebase()
-    return firebase_manager
+    global _firebase_manager
+    if _firebase_manager is None:
+        _firebase_manager = FirebaseDataManager()
+        _firebase_manager.initialize_firebase()
+    return _firebase_manager

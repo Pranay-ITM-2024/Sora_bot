@@ -317,4 +317,12 @@ class HybridDataManager:
         return stats
 
 # Global hybrid data manager instance
-hybrid_manager = HybridDataManager()
+# Global instance with lazy initialization
+_hybrid_manager = None
+
+def get_hybrid_manager():
+    """Get hybrid manager instance (lazy initialization)"""
+    global _hybrid_manager
+    if _hybrid_manager is None:
+        _hybrid_manager = HybridDataManager()
+    return _hybrid_manager

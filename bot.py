@@ -21,7 +21,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Import hybrid data manager for Firebase + JSON backup
-from hybrid_data_manager import hybrid_manager
+from hybrid_data_manager import get_hybrid_manager
 
 # Load environment variables
 load_dotenv('.env')
@@ -35,6 +35,9 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
+
+# Initialize data manager
+hybrid_manager = get_hybrid_manager()
 
 # Suppress PyNaCl warning for economy bot (voice not needed)
 logging.getLogger('discord.client').setLevel(logging.ERROR)
@@ -326,7 +329,8 @@ async def migrate_to_firebase(ctx):
         data = await data_manager.load_data()
         
         # Force migration
-        from firebase_manager import firebase_manager
+        from firebase_manager import get_firebase_manager
+        firebase_manager = get_firebase_manager()
         success = await firebase_manager.migrate_from_json(data)
         
         if success:
