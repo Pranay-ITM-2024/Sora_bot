@@ -13,21 +13,19 @@ services:
       - key: DISCORD_TOKEN
         sync: false  # Set this in Render dashboard
       
-      # GitHub Token for Gist backups (RECOMMENDED for data persistence)
-      - key: GITHUB_TOKEN
-        sync: false  # Create at https://github.com/settings/tokens
+      # Firebase Environment Variables (RECOMMENDED for cloud persistence)
+      - key: FIREBASE_PROJECT_ID
+        sync: false  # Your Firebase project ID
       
-      # Optional: Webhook for external backup storage
-      - key: BACKUP_WEBHOOK_URL
-        sync: false  # Your external backup service URL
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false  # Firebase service account email
       
-      # Optional: Discord webhook for emergency backups
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false  # Firebase private key from service account JSON
+      
+      # Optional: Discord webhook for backup notifications
       - key: DISCORD_BACKUP_WEBHOOK
         sync: false  # Discord webhook URL for backup notifications
-      
-      # Optional: Existing Gist ID (auto-created if not provided)
-      - key: GIST_ID
-        sync: false  # Will be auto-generated if not set
     
     scaling:
       minInstances: 1

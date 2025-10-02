@@ -63,10 +63,6 @@ FIREBASE_SERVICE_ACCOUNT_PATH=./serviceAccountKey.json
 # FIREBASE_PROJECT_ID=your-project-id
 # FIREBASE_PRIVATE_KEY="your-private-key"
 # FIREBASE_CLIENT_EMAIL=your-service-account-email
-
-# Optional: GitHub Backup (still works as secondary backup)
-# GITHUB_TOKEN=your_github_token
-# GIST_ID=your_gist_id
 ```
 
 ## 🚀 For Render Deployment
