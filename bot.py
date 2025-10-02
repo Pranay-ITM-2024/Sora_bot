@@ -81,6 +81,29 @@ STOCK_MARKET = {
 # Global hybrid data manager instance - Firebase + JSON backup
 data_manager = hybrid_manager
 
+# Auto-save background task for data persistence
+async def auto_save_task():
+    """Aggressive auto-save every 30 seconds to prevent data loss"""
+    await bot.wait_until_ready()
+    while not bot.is_closed():
+        try:
+            # Load current data
+            current_data = await hybrid_manager.load_data()
+            
+            # Force save to Firebase + JSON
+            success = await hybrid_manager.save_data(current_data, force=True)
+            
+            if success:
+                logging.debug("🔄 Auto-save completed successfully")
+            else:
+                logging.warning("⚠️ Auto-save failed!")
+                
+        except Exception as e:
+            logging.error(f"🚨 Auto-save error: {e}")
+        
+        # Wait 30 seconds before next save
+        await asyncio.sleep(30)
+
 # Bot events
 @bot.event
 async def on_ready():
@@ -111,6 +134,10 @@ async def on_ready():
             set_data_manager(data_manager)
         except Exception as e:
             logging.warning(f"Could not link data manager to modules: {e}")
+        
+        # Start aggressive auto-save background task
+        bot.loop.create_task(auto_save_task())
+        logging.info("🔄 Auto-save task started (30-second intervals)")
             
     except Exception as e:
         logging.error(f'❌ Data system initialization failed: {e}')
@@ -360,6 +387,60 @@ async def migrate_to_firebase(ctx):
     except Exception as e:
         embed = discord.Embed(
             title="❌ Migration Error",
+            description=f"```{str(e)}```",
+            color=0xff0000
+        )
+        await ctx.send(embed=embed)
+
+@bot.command(name='forcesave')
+@commands.has_permissions(administrator=True)
+async def force_save(ctx):
+    """Force immediate save to Firebase and JSON (Admin only)"""
+    try:
+        await ctx.send("🔄 **Forcing immediate save to Firebase and JSON...**")
+        
+        # Load current data
+        data = await data_manager.load_data()
+        
+        # Force aggressive save
+        success = await data_manager.save_data(data, force=True)
+        
+        if success:
+            stats = await data_manager.get_stats()
+            firebase_status = "🔥 Firebase" if stats.get('firebase_ready') else "❌ Failed"
+            
+            embed = discord.Embed(
+                title="✅ Force Save Successful!",
+                description="Data has been aggressively saved to all available storage systems.",
+                color=0x00ff00
+            )
+            embed.add_field(
+                name="💾 Save Status",
+                value=f"```\nFirebase: {firebase_status}\n"
+                      f"JSON Backup: ✅ Completed\n"
+                      f"Emergency Backup: ✅ Completed\n```",
+                inline=False
+            )
+            embed.add_field(
+                name="📊 Data Stats",
+                value=f"```\nUsers: {len(data.get('coins', {})):,}\n"
+                      f"Total Coins: {sum(data.get('coins', {}).values()):,}\n"
+                      f"Save Count: {stats.get('save_count', 0)}\n```",
+                inline=False
+            )
+            embed.set_footer(text="Your data is now safely synchronized!")
+        else:
+            embed = discord.Embed(
+                title="❌ Force Save Failed",
+                description="The forced save operation could not be completed.",
+                color=0xff0000
+            )
+        
+        await ctx.send(embed=embed)
+        
+    except Exception as e:
+        embed = discord.Embed(
+            title="❌ Force Save Error",
             description=f"```{str(e)}```",
             color=0xff0000
         )

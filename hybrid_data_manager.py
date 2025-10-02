@@ -8,6 +8,7 @@ import json
 import os
 import logging
 import datetime
+import asyncio
 from typing import Dict, Any, Optional
 import aiofiles
 from pathlib import Path
@@ -136,10 +137,10 @@ class HybridDataManager:
             return default_data
     
     async def save_data(self, data: Dict[str, Any], force: bool = False) -> bool:
-        """Save data to both Firebase and JSON"""
+        """AGGRESSIVE save to both Firebase and JSON with Firebase priority"""
         if self._is_saving and not force:
-            logging.debug("Save already in progress, skipping...")
-            return True
+            logging.debug("Save already in progress, forcing through...")
+            # Don't skip - force saves are critical
         
         try:
             self._is_saving = True
@@ -157,36 +158,45 @@ class HybridDataManager:
             data["_meta"]["firebase_enabled"] = self.is_firebase_ready()
             data["_meta"]["version"] = "4.0_hybrid"
             
-            success_count = 0
-            total_attempts = 0
+            firebase_success = False
+            json_success = False
             
-            # Save to Firebase (primary)
+            # PRIORITY 1: AGGRESSIVE Firebase Save with retries
             if self.is_firebase_ready():
-                total_attempts += 1
-                try:
-                    if self.firebase_manager.save_data(data):
-                        success_count += 1
-                        logging.debug("🔥 Data saved to Firebase")
-                    else:
-                        logging.warning("❌ Firebase save failed")
-                except Exception as e:
-                    logging.error(f"🔥 Firebase save error: {e}")
+                for attempt in range(3):  # 3 attempts for Firebase
+                    try:
+                        if self.firebase_manager.save_data(data):
+                            firebase_success = True
+                            logging.info(f"🔥 Firebase save successful (attempt {attempt + 1})")
+                            break
+                        else:
+                            logging.warning(f"❌ Firebase save failed (attempt {attempt + 1})")
+                            if attempt < 2:
+                                await asyncio.sleep(0.5)  # Brief delay before retry
+                    except Exception as e:
+                        logging.error(f"🔥 Firebase save error (attempt {attempt + 1}): {e}")
+                        if attempt < 2:
+                            await asyncio.sleep(0.5)
+                
+                if not firebase_success:
+                    logging.error("🚨 ALL Firebase save attempts FAILED! Data may be lost on restart!")
+            else:
+                logging.warning("🔥 Firebase not available - using JSON only")
             
-            # Save to JSON (backup/fallback)
-            total_attempts += 1
+            # PRIORITY 2: JSON Backup (always do this)
             try:
                 await self._save_json_backup(data)
-                success_count += 1
-                logging.debug("📄 Data saved to JSON")
+                json_success = True
+                logging.debug("📄 JSON backup successful")
             except Exception as e:
                 logging.error(f"📄 JSON save error: {e}")
             
-            # Emergency backup
+            # PRIORITY 3: Emergency backup (always do this)
             try:
                 async with aiofiles.open(EMERGENCY_BACKUP, 'w') as f:
                     await f.write(json.dumps(data, indent=2, default=str))
             except Exception as e:
-                logging.warning(f"Emergency backup failed: {e}")
+                logging.error(f"🚨 Emergency backup failed: {e}")
             
             # Update cache and metrics
             self._data_cache = data.copy()
@@ -195,19 +205,17 @@ class HybridDataManager:
             user_count = len(data.get("coins", {}))
             total_coins = sum(data.get("coins", {}).values())
             
-            if success_count > 0:
-                storage_info = []
-                if self.is_firebase_ready() and success_count >= 1:
-                    storage_info.append("Firebase")
-                if success_count >= (1 if self.is_firebase_ready() else 1):
-                    storage_info.append("JSON")
-                
-                logging.info(f"💾 Save #{self.save_count} successful ({'/'.join(storage_info)}) - {user_count} users, {total_coins:,} coins")
+            # Report save status
+            if firebase_success:
+                logging.info(f"💾 Save #{self.save_count} SUCCESS (Firebase + JSON) - {user_count} users, {total_coins:,} coins")
                 return True
+            elif json_success:
+                logging.warning(f"⚠️ Save #{self.save_count} PARTIAL (JSON only) - {user_count} users, {total_coins:,} coins")
+                return True  # Still successful, but warn about Firebase
             else:
-                logging.error(f"❌ All save methods failed ({success_count}/{total_attempts})")
+                logging.error(f"❌ Save #{self.save_count} FAILED (all methods) - DATA MAY BE LOST!")
                 return False
-            
+                storage_info = []
         except Exception as e:
             logging.error(f"❌ Critical save error: {e}")
             return False
