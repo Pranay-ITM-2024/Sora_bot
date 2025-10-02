@@ -2,29 +2,15 @@
 """
 HYBRID DATA MANAGER FOR SORABOT
 Combines Firebase Firestore with JSON backup for ultimate reliability
-- Primary: Firebase Firestore (cloud persistence)
-- Fallback: JSON files (local backup)
-- Zero data loss guarantee
 """
 
-import asyncio
 import json
 import os
 import logging
 import datetime
-from typing import Dict, List, Optional, Any
+from typing import Dict, Any, Optional
 import aiofiles
 from pathlib import Path
-
-# Try to import Firebase (optional dependency)
-try:
-    from firebase_manager import firebase_manager
-    FIREBASE_AVAILABLE = True
-    logging.info("🔥 Firebase integration available")
-except ImportError:
-    FIREBASE_AVAILABLE = False
-    firebase_manager = None
-    logging.warning("⚠️ Firebase not available - using JSON mode only")
 
 # File paths
 DATA_FILE = Path("data.json")
@@ -35,11 +21,10 @@ class HybridDataManager:
     """
     Hybrid data manager with Firebase + JSON backup
     Features:
-    - Firebase Firestore for cloud persistence
+    - Firebase Firestore for cloud persistence (when available)
     - JSON files for local backup and fallback
     - Automatic migration between systems
     - Zero downtime data access
-    - Enterprise-level reliability
     """
     
     def __init__(self):
@@ -50,40 +35,41 @@ class HybridDataManager:
         self._data_cache = None
         self._is_saving = False
         
-        # Firebase status
-        self.firebase_enabled = FIREBASE_AVAILABLE
+        # Firebase manager (lazy loaded)
+        self.firebase_manager = None
+        self.firebase_enabled = False
         self.firebase_ready = False
         
-        # Check Firebase availability
-        if self.firebase_enabled:
-            asyncio.create_task(self._check_firebase_ready())
-        
-        logging.info(f"🔧 Hybrid Data Manager initialized - Firebase: {'✅' if self.firebase_enabled else '❌'}")
+        logging.info("🔧 Hybrid Data Manager initialized")
     
-    async def _check_firebase_ready(self):
-        """Check if Firebase is ready"""
-        if not self.firebase_enabled:
-            return
+    def _get_firebase_manager(self):
+        """Get Firebase manager with lazy loading"""
+        if self.firebase_manager is None:
+            try:
+                from firebase_manager import get_firebase_manager
+                self.firebase_manager = get_firebase_manager()
+                self.firebase_enabled = True
+                self.firebase_ready = self.firebase_manager.is_available()
+                
+                if self.firebase_ready:
+                    logging.info("🔥 Firebase integration active")
+                else:
+                    logging.info("📄 JSON-only mode active")
+                    
+            except Exception as e:
+                logging.warning(f"🔥 Firebase not available: {e}")
+                self.firebase_enabled = False
+                self.firebase_ready = False
         
-        try:
-            # Wait for Firebase to initialize
-            for attempt in range(10):  # Wait up to 10 seconds
-                if firebase_manager.is_available():
-                    self.firebase_ready = True
-                    logging.info("🔥 Firebase is ready for data operations")
-                    return
-                await asyncio.sleep(1)
-            
-            logging.warning("⚠️ Firebase initialization timeout - using JSON mode")
-            self.firebase_ready = False
-            
-        except Exception as e:
-            logging.error(f"Firebase check failed: {e}")
-            self.firebase_ready = False
+        return self.firebase_manager
     
     def is_firebase_ready(self) -> bool:
         """Check if Firebase is ready for operations"""
-        return self.firebase_enabled and self.firebase_ready and firebase_manager.is_available()
+        if not self.firebase_enabled:
+            return False
+        
+        manager = self._get_firebase_manager()
+        return manager and manager.is_available()
     
     async def load_data(self) -> Dict[str, Any]:
         """Load data with Firebase priority, JSON fallback"""
@@ -92,7 +78,7 @@ class HybridDataManager:
         # Try Firebase first (if available)
         if self.is_firebase_ready():
             try:
-                firebase_data = await firebase_manager.load_full_data()
+                firebase_data = self.firebase_manager.load_data()
                 if firebase_data:
                     logging.info("🔥 Data loaded from Firebase Firestore")
                     self._data_cache = firebase_data.copy()
@@ -101,9 +87,9 @@ class HybridDataManager:
                     await self._save_json_backup(firebase_data)
                     return firebase_data
                 else:
-                    logging.warning("No data found in Firebase, trying JSON...")
+                    logging.warning("🔥 No data found in Firebase, trying JSON...")
             except Exception as e:
-                logging.error(f"Firebase load failed: {e}, falling back to JSON")
+                logging.error(f"🔥 Firebase load failed: {e}, falling back to JSON")
         
         # Fallback to JSON
         try:
@@ -117,7 +103,7 @@ class HybridDataManager:
                 # If Firebase is ready, migrate the data
                 if self.is_firebase_ready():
                     logging.info("🔄 Migrating JSON data to Firebase...")
-                    await firebase_manager.migrate_from_json(json_data)
+                    self.firebase_manager.migrate_from_json(json_data)
                 
                 self._data_cache = json_data.copy()
                 return json_data
@@ -129,6 +115,12 @@ class HybridDataManager:
                 
                 logging.warning("🚨 Loaded from emergency backup")
                 self._data_cache = backup_data.copy()
+                
+                # Migrate to Firebase if available
+                if self.is_firebase_ready():
+                    logging.info("🔄 Migrating emergency backup to Firebase...")
+                    self.firebase_manager.migrate_from_json(backup_data)
+                
                 return backup_data
             
             else:
@@ -172,13 +164,13 @@ class HybridDataManager:
             if self.is_firebase_ready():
                 total_attempts += 1
                 try:
-                    if await firebase_manager.save_full_data(data):
+                    if self.firebase_manager.save_data(data):
                         success_count += 1
                         logging.debug("🔥 Data saved to Firebase")
                     else:
                         logging.warning("❌ Firebase save failed")
                 except Exception as e:
-                    logging.error(f"Firebase save error: {e}")
+                    logging.error(f"🔥 Firebase save error: {e}")
             
             # Save to JSON (backup/fallback)
             total_attempts += 1
@@ -187,7 +179,7 @@ class HybridDataManager:
                 success_count += 1
                 logging.debug("📄 Data saved to JSON")
             except Exception as e:
-                logging.error(f"JSON save error: {e}")
+                logging.error(f"📄 JSON save error: {e}")
             
             # Emergency backup
             try:
@@ -265,12 +257,13 @@ class HybridDataManager:
             "items": {},
             "inventories": {},
             "equipped": {},
+            "equipment": {},
             "guilds": {},
             "guild_members": {},
             "guild_invites": {},
             "stock_holdings": {},
             "stock_portfolios": {},
-            "stock_market": {},
+            "stock_market": {"price_history": {}},
             "stock_prices": {},
             "consumable_effects": {},
             "loot_tables": {},
@@ -303,73 +296,6 @@ class HybridDataManager:
             }
         }
     
-    async def get_user_data(self, user_id: str) -> Dict[str, Any]:
-        """Get specific user data (Firebase optimized)"""
-        if self.is_firebase_ready():
-            try:
-                user_data = await firebase_manager.load_user_data(user_id)
-                if user_data:
-                    return user_data
-            except Exception as e:
-                logging.error(f"Firebase user load failed: {e}")
-        
-        # Fallback to full data
-        if self._data_cache:
-            return {
-                'coins': self._data_cache.get('coins', {}).get(user_id, 0),
-                'bank': self._data_cache.get('bank', {}).get(user_id, 0),
-                'inventory': self._data_cache.get('inventories', {}).get(user_id, []),
-                'equipped': self._data_cache.get('equipped', {}).get(user_id, {}),
-            }
-        
-        return {}
-    
-    async def update_user_coins(self, user_id: str, amount: int) -> bool:
-        """Update user coins with atomic transaction"""
-        if self.is_firebase_ready():
-            try:
-                success = await firebase_manager.atomic_transaction(user_id, 'coins', amount)
-                if success:
-                    # Update local cache
-                    if self._data_cache:
-                        current = self._data_cache.get('coins', {}).get(user_id, 0)
-                        self._data_cache.setdefault('coins', {})[user_id] = current + amount
-                    return True
-            except Exception as e:
-                logging.error(f"Firebase atomic transaction failed: {e}")
-        
-        # Fallback to cache update
-        if self._data_cache:
-            current = self._data_cache.get('coins', {}).get(user_id, 0)
-            new_amount = current + amount
-            if new_amount >= 0:
-                self._data_cache.setdefault('coins', {})[user_id] = new_amount
-                # Save updated data
-                await self.save_data(self._data_cache)
-                return True
-        
-        return False
-    
-    async def get_leaderboard(self, field: str = 'coins', limit: int = 10) -> List[Dict[str, Any]]:
-        """Get leaderboard data"""
-        if self.is_firebase_ready():
-            try:
-                return await firebase_manager.get_leaderboard(field, limit)
-            except Exception as e:
-                logging.error(f"Firebase leaderboard failed: {e}")
-        
-        # Fallback to cache-based leaderboard
-        if self._data_cache:
-            field_data = self._data_cache.get(field, {})
-            sorted_users = sorted(field_data.items(), key=lambda x: x[1], reverse=True)[:limit]
-            
-            return [
-                {'user_id': user_id, field: value}
-                for user_id, value in sorted_users
-            ]
-        
-        return []
-    
     async def get_stats(self) -> Dict[str, Any]:
         """Get comprehensive data manager statistics"""
         stats = {
@@ -380,13 +306,6 @@ class HybridDataManager:
             'last_save': self.last_save_time.isoformat(),
             'cache_size': len(str(self._data_cache)) if self._data_cache else 0
         }
-        
-        if self.is_firebase_ready():
-            try:
-                firebase_stats = await firebase_manager.get_stats()
-                stats.update({'firebase_' + k: v for k, v in firebase_stats.items()})
-            except:
-                pass
         
         if self._data_cache:
             stats.update({
