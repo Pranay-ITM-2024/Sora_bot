@@ -4,7 +4,6 @@ ZERO TOLERANCE FOR DATA LOSS - Immediate saves on every operation
 """
 
 import json
-import aiofiles
 import logging
 from pathlib import Path
 
@@ -41,53 +40,19 @@ class DataManager:
             return False
     
     async def save_data(self, data):
-        """AGGRESSIVE save with force"""
+        """AGGRESSIVE save to Firebase with force"""
         if _global_data_manager:
             return await _global_data_manager.save_data(data, force=True)
         else:
-            # Fallback save
-            return await self._fallback_save(data)
+            logging.error("❌ No Firebase data manager available! Cannot save data!")
+            return False
     
     async def load_data(self):
-        """Load data with AGGRESSIVE recovery"""
+        """Load data from Firebase ONLY"""
         if _global_data_manager:
             return await _global_data_manager.load_data()
         else:
-            # Fallback load
-            return await self._fallback_load()
-    
-    async def _fallback_save(self, data):
-        """Fallback save method"""
-        try:
-            async with aiofiles.open(DATA_FILE, 'w') as f:
-                await f.write(json.dumps(data, indent=2, default=str))
-            # Also save emergency backup
-            async with aiofiles.open(EMERGENCY_BACKUP, 'w') as f:
-                await f.write(json.dumps(data, indent=2, default=str))
-            logging.info("💾 Fallback save completed")
-            return True
-        except Exception as e:
-            logging.error(f"Fallback save failed: {e}")
-            return False
-    
-    async def _fallback_load(self):
-        """Fallback load method"""
-        try:
-            # Try primary file
-            if Path(DATA_FILE).exists():
-                async with aiofiles.open(DATA_FILE, 'r') as f:
-                    return json.loads(await f.read())
-            
-            # Try emergency backup
-            if Path(EMERGENCY_BACKUP).exists():
-                async with aiofiles.open(EMERGENCY_BACKUP, 'r') as f:
-                    return json.loads(await f.read())
-            
-            # Return default data
-            return self._get_default_data()
-            
-        except Exception as e:
-            logging.error(f"Fallback load failed: {e}")
+            logging.error("❌ No Firebase data manager available!")
             return self._get_default_data()
     
     def _get_default_data(self):

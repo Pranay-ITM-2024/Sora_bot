@@ -5,10 +5,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import json
-import aiofiles
 from pathlib import Path
-
-DATA_PATH = Path(__file__).parent.parent / "data.json"
+from .database import load_data, save_data
 
 class Admin(commands.Cog):
     def __init__(self, bot):
@@ -97,8 +95,7 @@ class Admin(commands.Cog):
             return
         
         try:
-            async with aiofiles.open(DATA_PATH, 'r') as f:
-                data = json.loads(await f.read())
+            data = await load_data()
         except:
             data = {}
         

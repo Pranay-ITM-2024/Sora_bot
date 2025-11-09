@@ -6,32 +6,9 @@ from discord import app_commands
 from discord.ext import commands
 import random
 import json
-import aiofiles
 from pathlib import Path
 import asyncio
-
-DATA_PATH = Path(__file__).parent.parent / "data.json"
-_data_lock = asyncio.Lock()
-
-async def load_data():
-    """Load data from JSON file with concurrency protection"""
-    async with _data_lock:
-        try:
-            async with aiofiles.open(DATA_PATH, 'r') as f:
-                return json.loads(await f.read())
-        except:
-            return {}
-
-async def save_data(data):
-    """Save data to JSON file with atomic writes"""
-    async with _data_lock:
-        try:
-            temp_path = DATA_PATH.with_suffix('.tmp')
-            async with aiofiles.open(temp_path, 'w') as f:
-                await f.write(json.dumps(data, indent=2, default=str))
-            temp_path.replace(DATA_PATH)
-        except Exception as e:
-            print(f"Error saving data: {e}")
+from .database import load_data, save_data
 
 def get_rarity_color(rarity):
     """Get color for item rarity"""
