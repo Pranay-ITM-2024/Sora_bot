@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-FIREBASE DATA MANAGER FOR SORABOT
-Simple, reliable Firebase Firestore integration
+FIREBASE REALTIME DATABASE MANAGER FOR SORABOT
+Simple, reliable Firebase Realtime Database integration
 """
 
 import json
@@ -13,23 +13,23 @@ from typing import Dict, List, Optional, Any
 # Try to import Firebase (optional dependency)
 try:
     import firebase_admin
-    from firebase_admin import credentials, firestore
+    from firebase_admin import credentials, db
     FIREBASE_AVAILABLE = True
 except ImportError:
     FIREBASE_AVAILABLE = False
     firebase_admin = None
-    firestore = None
+    db = None
 
 class FirebaseDataManager:
-    """Simple Firebase Firestore integration"""
+    """Simple Firebase Realtime Database integration"""
     
     def __init__(self):
-        self.db = None
+        self.db_ref = None
         self.firebase_available = False
         self._initialized = False
     
     def initialize_firebase(self):
-        """Initialize Firebase connection synchronously"""
+        """Initialize Firebase Realtime Database connection"""
         if self._initialized:
             return self.firebase_available
             
@@ -41,43 +41,48 @@ class FirebaseDataManager:
         try:
             # Check if Firebase is already initialized
             if not firebase_admin._apps:
-                # Get Firebase credentials from environment
-                project_id = os.getenv('FIREBASE_PROJECT_ID')
-                private_key = os.getenv('FIREBASE_PRIVATE_KEY')
-                client_email = os.getenv('FIREBASE_CLIENT_EMAIL')
-                
-                if not all([project_id, private_key, client_email]):
-                    logging.warning("🔥 Firebase credentials not found - using JSON fallback")
-                    self._initialized = True
-                    return False
-                
-                # Create credentials object
-                cred_dict = {
-                    "type": "service_account",
-                    "project_id": project_id,
-                    "private_key": private_key.replace('\\n', '\n'),
-                    "client_email": client_email,
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs"
+                # Firebase configuration
+                firebase_config = {
+                    "apiKey": "AIzaSyBgVbPpOenpLAW--9L0nv6PU-3u1z1uTu8",
+                    "authDomain": "sorabotthenew.firebaseapp.com",
+                    "projectId": "sorabotthenew",
+                    "storageBucket": "sorabotthenew.firebasestorage.app",
+                    "messagingSenderId": "860618153543",
+                    "appId": "1:860618153543:web:8a2f4f44b27323a7511b62",
+                    "measurementId": "G-NJJRYBSWBX",
+                    "databaseURL": "https://sorabotthenew-default-rtdb.firebaseio.com"
                 }
                 
-                cred = credentials.Certificate(cred_dict)
-                firebase_admin.initialize_app(cred)
-                logging.info("🔥 Firebase Admin SDK initialized successfully")
+                # Initialize with minimal credentials for Realtime Database
+                cred = credentials.Certificate({
+                    "type": "service_account",
+                    "project_id": "sorabotthenew",
+                    "private_key_id": os.getenv('FIREBASE_PRIVATE_KEY_ID', 'dummy'),
+                    "private_key": os.getenv('FIREBASE_PRIVATE_KEY', '').replace('\\n', '\n') if os.getenv('FIREBASE_PRIVATE_KEY') else None,
+                    "client_email": os.getenv('FIREBASE_CLIENT_EMAIL', 'firebase-adminsdk@sorabotthenew.iam.gserviceaccount.com'),
+                    "client_id": os.getenv('FIREBASE_CLIENT_ID', ''),
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs"
+                })
+                
+                firebase_admin.initialize_app(cred, {
+                    'databaseURL': firebase_config['databaseURL']
+                })
+                logging.info("🔥 Firebase Realtime Database initialized successfully")
             
-            # Get Firestore client
-            self.db = firestore.client()
+            # Get database reference
+            self.db_ref = db.reference('/')
             self.firebase_available = True
-            logging.info("🔥 Firebase Firestore connected successfully")
+            logging.info("🔥 Firebase Realtime Database connected successfully")
             
             # Test connection
-            test_ref = self.db.collection('meta').document('connection_test')
-            test_ref.set({
+            test_data = {
                 'test': True,
-                'timestamp': datetime.datetime.now(datetime.timezone.utc),
+                'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 'status': 'connected'
-            })
+            }
+            db.reference('/meta/connection_test').set(test_data)
             logging.info("🔥 Firebase connection test successful")
             
         except Exception as e:
@@ -90,19 +95,21 @@ class FirebaseDataManager:
     
     def is_available(self) -> bool:
         """Check if Firebase is available"""
-        return self.firebase_available and self.db is not None
+        return self.firebase_available and self.db_ref is not None
     
     def save_data(self, data: Dict[str, Any]) -> bool:
-        """Save data to Firebase"""
+        """Save data to Firebase Realtime Database"""
         if not self.is_available():
             return False
         
         try:
-            # Save main bot data
-            bot_ref = self.db.collection('bot_data').document('main')
-            bot_ref.set(data)
+            # Convert datetime objects to strings for JSON serialization
+            serializable_data = json.loads(json.dumps(data, default=str))
             
-            logging.debug("🔥 Data saved to Firebase")
+            # Save to /bot_data path in Realtime Database
+            db.reference('/bot_data').set(serializable_data)
+            
+            logging.debug("🔥 Data saved to Firebase Realtime Database")
             return True
             
         except Exception as e:
@@ -110,17 +117,16 @@ class FirebaseDataManager:
             return False
     
     def load_data(self) -> Optional[Dict[str, Any]]:
-        """Load data from Firebase"""
+        """Load data from Firebase Realtime Database"""
         if not self.is_available():
             return None
         
         try:
-            bot_ref = self.db.collection('bot_data').document('main')
-            doc = bot_ref.get()
+            # Load from /bot_data path
+            data = db.reference('/bot_data').get()
             
-            if doc.exists:
-                data = doc.to_dict()
-                logging.debug("🔥 Data loaded from Firebase")
+            if data:
+                logging.debug("🔥 Data loaded from Firebase Realtime Database")
                 return data
             else:
                 logging.warning("🔥 No data found in Firebase")
@@ -131,7 +137,7 @@ class FirebaseDataManager:
             return None
     
     def migrate_from_json(self, json_data: Dict[str, Any]) -> bool:
-        """Migrate JSON data to Firebase"""
+        """Migrate JSON data to Firebase Realtime Database"""
         if not self.is_available():
             return False
         

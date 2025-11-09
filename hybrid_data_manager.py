@@ -1,36 +1,22 @@
 #!/usr/bin/env python3
 """
-HYBRID DATA MANAGER FOR SORABOT
-Combines Firebase Firestore with JSON backup for ultimate reliability
+FIREBASE REALTIME DATABASE DATA MANAGER FOR SORABOT
+Simple, reliable Firebase-only data persistence
 """
 
 import json
-import os
 import logging
 import datetime
 import asyncio
 from typing import Dict, Any, Optional
-import aiofiles
-from pathlib import Path
 
-# File paths
-DATA_FILE = Path("data.json")
-BACKUP_DIR = Path("backups")
-EMERGENCY_BACKUP = Path("emergency_backup.json")
-
-class HybridDataManager:
+class FirebaseOnlyDataManager:
     """
-    Hybrid data manager with Firebase + JSON backup
-    Features:
-    - Firebase Firestore for cloud persistence (when available)
-    - JSON files for local backup and fallback
-    - Automatic migration between systems
-    - Zero downtime data access
+    Firebase Realtime Database manager - NO LOCAL FILES
+    All data stored in Firebase Realtime Database only
     """
     
     def __init__(self):
-        self.backup_dir = BACKUP_DIR
-        self.backup_dir.mkdir(exist_ok=True)
         self.save_count = 0
         self.last_save_time = datetime.datetime.now(datetime.timezone.utc)
         self._data_cache = None
@@ -41,7 +27,7 @@ class HybridDataManager:
         self.firebase_enabled = False
         self.firebase_ready = False
         
-        logging.info("🔧 Hybrid Data Manager initialized")
+        logging.info("🔧 Firebase-Only Data Manager initialized")
     
     def _get_firebase_manager(self):
         """Get Firebase manager with lazy loading"""

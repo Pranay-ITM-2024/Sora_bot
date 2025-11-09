@@ -20,8 +20,8 @@ import logging
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Import hybrid data manager for Firebase + JSON backup
-from hybrid_data_manager import get_hybrid_manager
+# Import Firebase-only data manager
+from firebase_data_manager import get_firebase_manager
 
 # Load environment variables
 load_dotenv('.env')
@@ -36,8 +36,8 @@ logging.basicConfig(
     ]
 )
 
-# Initialize data manager
-hybrid_manager = get_hybrid_manager()
+# Initialize Firebase-only data manager
+firebase_data_manager = get_firebase_manager()
 
 # Suppress PyNaCl warning for economy bot (voice not needed)
 logging.getLogger('discord.client').setLevel(logging.ERROR)
@@ -49,11 +49,6 @@ intents.guilds = True
 intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
-
-# File paths
-DATA_FILE = Path("data.json")
-BACKUP_DIR = Path("backups")
-EMERGENCY_BACKUP = Path("emergency_backup.json")
 
 # Global constants for economy
 INITIAL_COINS = 100
@@ -78,20 +73,20 @@ STOCK_MARKET = {
     "MINING": {"name": "Digital Mining Co", "base_price": 200, "volatility": 0.2}
 }
 
-# Global hybrid data manager instance - Firebase + JSON backup
-data_manager = hybrid_manager
+# Global Firebase-only data manager instance
+data_manager = firebase_data_manager
 
 # Auto-save background task for data persistence
 async def auto_save_task():
-    """Aggressive auto-save every 30 seconds to prevent data loss"""
+    """ULTRA-AGGRESSIVE auto-save every 10 seconds to prevent ANY data loss"""
     await bot.wait_until_ready()
     while not bot.is_closed():
         try:
             # Load current data
-            current_data = await hybrid_manager.load_data()
+            current_data = await firebase_data_manager.load_data()
             
-            # Force save to Firebase + JSON
-            success = await hybrid_manager.save_data(current_data, force=True)
+            # Force save to Firebase Realtime Database
+            success = await firebase_data_manager.save_data(current_data, force=True)
             
             if success:
                 logging.debug("🔄 Auto-save completed successfully")
@@ -101,8 +96,8 @@ async def auto_save_task():
         except Exception as e:
             logging.error(f"🚨 Auto-save error: {e}")
         
-        # Wait 30 seconds before next save
-        await asyncio.sleep(30)
+        # Wait only 10 seconds before next save - ULTRA AGGRESSIVE
+        await asyncio.sleep(10)
 
 # Bot events
 @bot.event
@@ -118,15 +113,19 @@ async def on_ready():
     except Exception as e:
         print(f'⚠️ Web server failed to start: {e}')
     
-    # Initialize hybrid data system (Firebase + JSON)
+    # Initialize Firebase Realtime Database system
     try:
-        # Test load data to ensure system is working
+        # Test load data to ensure Firebase is working
         test_data = await data_manager.load_data()
         
         stats = await data_manager.get_stats()
-        firebase_status = "🔥 Firebase" if stats.get('firebase_ready') else "📄 JSON"
+        firebase_status = "🔥 Firebase Realtime DB" if stats.get('firebase_ready') else "❌ OFFLINE"
         
-        logging.info(f'✅ Hybrid data system initialized ({firebase_status}) - {len(test_data.get("coins", {}))} users loaded')
+        logging.info(f'✅ Data system initialized ({firebase_status}) - {len(test_data.get("coins", {}))} users loaded')
+        
+        if not stats.get('firebase_ready'):
+            logging.error("❌ CRITICAL: Firebase Realtime Database is NOT connected!")
+            logging.error("❌ Bot will NOT function properly without Firebase!")
         
         # Link the data manager to bot modules
         try:
@@ -135,9 +134,9 @@ async def on_ready():
         except Exception as e:
             logging.warning(f"Could not link data manager to modules: {e}")
         
-        # Start aggressive auto-save background task
+        # Start ULTRA-AGGRESSIVE auto-save background task
         bot.loop.create_task(auto_save_task())
-        logging.info("🔄 Auto-save task started (30-second intervals)")
+        logging.info("🔄 ULTRA-AGGRESSIVE auto-save task started (10-second intervals)")
             
     except Exception as e:
         logging.error(f'❌ Data system initialization failed: {e}')
@@ -175,6 +174,24 @@ async def on_ready():
         pass
     
     print('🚀 SORABOT is ready with Firebase-powered data persistence!')
+
+@bot.event
+async def on_command_completion(ctx):
+    """Triggered after EVERY successful command - ensures immediate Firebase save"""
+    try:
+        # Load current data
+        current_data = await data_manager.load_data()
+        
+        # Force immediate save to Firebase after every command
+        success = await data_manager.save_data(current_data, force=True)
+        
+        if success:
+            logging.debug(f"✅ Post-command save for '{ctx.command.name}' by {ctx.author.name}")
+        else:
+            logging.error(f"❌ Post-command save FAILED for '{ctx.command.name}'")
+            
+    except Exception as e:
+        logging.error(f"❌ Post-command save error: {e}")
 
 @bot.event
 async def on_guild_join(guild):

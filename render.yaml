@@ -13,19 +13,18 @@ services:
       - key: DISCORD_TOKEN
         sync: false  # Set this in Render dashboard
       
-      # Firebase Environment Variables (RECOMMENDED for cloud persistence)
-      - key: FIREBASE_PROJECT_ID
-        sync: false  # Your Firebase project ID
+      # Firebase Realtime Database Credentials (REQUIRED)
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false  # Private key from Firebase service account JSON
       
       - key: FIREBASE_CLIENT_EMAIL
-        sync: false  # Firebase service account email
+        sync: false  # Client email from Firebase service account JSON
       
-      - key: FIREBASE_PRIVATE_KEY
-        sync: false  # Firebase private key from service account JSON
+      - key: FIREBASE_PRIVATE_KEY_ID
+        sync: false  # Private key ID from Firebase service account JSON
       
-      # Optional: Discord webhook for backup notifications
-      - key: DISCORD_BACKUP_WEBHOOK
-        sync: false  # Discord webhook URL for backup notifications
+      - key: FIREBASE_CLIENT_ID
+        sync: false  # Client ID from Firebase service account JSON
     
     scaling:
       minInstances: 1
