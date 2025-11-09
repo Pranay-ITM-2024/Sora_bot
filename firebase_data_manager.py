@@ -145,17 +145,28 @@ class FirebaseOnlyDataManager:
             self._is_saving = False
     
     def _validate_data(self, data: Dict[str, Any]) -> bool:
-        """Validate data structure"""
+        """Validate data structure - auto-fix missing keys"""
         if not isinstance(data, dict):
             return False
         
+        # Auto-add missing required keys
         required_keys = ["coins", "bank", "config"]
         for key in required_keys:
             if key not in data:
-                logging.warning(f"Missing required key: {key}")
-                return False
+                logging.info(f"🔧 Auto-adding missing key: {key}")
+                if key == "config":
+                    data[key] = {
+                        "daily_amount": 150,
+                        "weekly_amount": 1000,
+                        "initial_coins": 100
+                    }
+                else:
+                    data[key] = {}
+            
+            # Ensure it's a dict
             if not isinstance(data[key], dict):
-                return False
+                logging.warning(f"⚠️ Fixing invalid type for {key}, converting to dict")
+                data[key] = {}
         
         return True
     
