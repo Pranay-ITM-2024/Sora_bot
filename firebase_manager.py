@@ -41,8 +41,8 @@ class FirebaseDataManager:
         try:
             # Check if Firebase is already initialized
             if not firebase_admin._apps:
-                # Database URL for sorabotthenew project
-                database_url = "https://sorabotthenew-default-rtdb.firebaseio.com"
+                # Database URL for sorabotthenew project (Asia Southeast region)
+                database_url = "https://sorabotthenew-default-rtdb.asia-southeast1.firebasedatabase.app"
                 
                 # Try to get service account credentials from environment
                 private_key = os.getenv('FIREBASE_PRIVATE_KEY', '')
