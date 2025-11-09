@@ -34,41 +34,45 @@ class FirebaseDataManager:
             return self.firebase_available
             
         if not FIREBASE_AVAILABLE:
-            logging.warning("🔥 Firebase SDK not available - install with: pip install firebase-admin")
+            logging.error("🔥 Firebase SDK not available - install with: pip install firebase-admin")
             self._initialized = True
             return False
         
         try:
             # Check if Firebase is already initialized
             if not firebase_admin._apps:
-                # Firebase configuration
-                firebase_config = {
-                    "apiKey": "AIzaSyBgVbPpOenpLAW--9L0nv6PU-3u1z1uTu8",
-                    "authDomain": "sorabotthenew.firebaseapp.com",
-                    "projectId": "sorabotthenew",
-                    "storageBucket": "sorabotthenew.firebasestorage.app",
-                    "messagingSenderId": "860618153543",
-                    "appId": "1:860618153543:web:8a2f4f44b27323a7511b62",
-                    "measurementId": "G-NJJRYBSWBX",
-                    "databaseURL": "https://sorabotthenew-default-rtdb.firebaseio.com"
-                }
+                # Database URL for sorabotthenew project
+                database_url = "https://sorabotthenew-default-rtdb.firebaseio.com"
                 
-                # Initialize with minimal credentials for Realtime Database
-                cred = credentials.Certificate({
-                    "type": "service_account",
-                    "project_id": "sorabotthenew",
-                    "private_key_id": os.getenv('FIREBASE_PRIVATE_KEY_ID', 'dummy'),
-                    "private_key": os.getenv('FIREBASE_PRIVATE_KEY', '').replace('\\n', '\n') if os.getenv('FIREBASE_PRIVATE_KEY') else None,
-                    "client_email": os.getenv('FIREBASE_CLIENT_EMAIL', 'firebase-adminsdk@sorabotthenew.iam.gserviceaccount.com'),
-                    "client_id": os.getenv('FIREBASE_CLIENT_ID', ''),
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs"
-                })
+                # Try to get service account credentials from environment
+                private_key = os.getenv('FIREBASE_PRIVATE_KEY', '')
+                client_email = os.getenv('FIREBASE_CLIENT_EMAIL', '')
                 
-                firebase_admin.initialize_app(cred, {
-                    'databaseURL': firebase_config['databaseURL']
-                })
+                # Check if we have credentials
+                if private_key and client_email:
+                    logging.info("🔥 Using service account credentials from environment")
+                    cred = credentials.Certificate({
+                        "type": "service_account",
+                        "project_id": "sorabotthenew",
+                        "private_key": private_key.replace('\\n', '\n'),
+                        "client_email": client_email,
+                        "token_uri": "https://oauth2.googleapis.com/token",
+                        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs"
+                    })
+                else:
+                    # Try anonymous/public access (requires database rules to allow)
+                    logging.warning("🔥 No credentials found - attempting public database access")
+                    logging.warning("⚠️ Make sure your Firebase Realtime Database rules allow public read/write!")
+                    cred = None
+                
+                # Initialize Firebase
+                if cred:
+                    firebase_admin.initialize_app(cred, {'databaseURL': database_url})
+                else:
+                    # Initialize without credentials (for public databases)
+                    firebase_admin.initialize_app(options={'databaseURL': database_url})
+                
                 logging.info("🔥 Firebase Realtime Database initialized successfully")
             
             # Get database reference
@@ -83,11 +87,13 @@ class FirebaseDataManager:
                 'status': 'connected'
             }
             db.reference('/meta/connection_test').set(test_data)
-            logging.info("🔥 Firebase connection test successful")
+            logging.info("🔥 Firebase connection test successful - data read/write working!")
             
         except Exception as e:
             logging.error(f"🔥 Firebase initialization failed: {e}")
-            logging.warning("🔥 Falling back to JSON data storage")
+            logging.error(f"🔥 Error details: {type(e).__name__}: {str(e)}")
+            logging.error("� Fix: Go to Firebase Console → Realtime Database → Rules")
+            logging.error("💡 Set rules to: {\"rules\": {\".read\": true, \".write\": true}}")
             self.firebase_available = False
         
         self._initialized = True
