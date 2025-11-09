@@ -49,29 +49,30 @@ class FirebaseDataManager:
                 client_email = os.getenv('FIREBASE_CLIENT_EMAIL', '')
                 
                 # Check if we have credentials
-                if private_key and client_email:
-                    logging.info("🔥 Using service account credentials from environment")
-                    cred = credentials.Certificate({
-                        "type": "service_account",
-                        "project_id": "sorabotthenew",
-                        "private_key": private_key.replace('\\n', '\n'),
-                        "client_email": client_email,
-                        "token_uri": "https://oauth2.googleapis.com/token",
-                        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs"
-                    })
-                else:
-                    # Try anonymous/public access (requires database rules to allow)
-                    logging.warning("🔥 No credentials found - attempting public database access")
-                    logging.warning("⚠️ Make sure your Firebase Realtime Database rules allow public read/write!")
-                    cred = None
+                if not private_key or not client_email:
+                    logging.error("❌ FIREBASE CREDENTIALS MISSING!")
+                    logging.error("📋 Follow these steps to get credentials:")
+                    logging.error("1. Go to: https://console.firebase.google.com/project/sorabotthenew/settings/serviceaccounts/adminsdk")
+                    logging.error("2. Click 'Generate New Private Key'")
+                    logging.error("3. Download the JSON file")
+                    logging.error("4. In Render dashboard, add these environment variables:")
+                    logging.error("   FIREBASE_PRIVATE_KEY = (copy the 'private_key' value from JSON)")
+                    logging.error("   FIREBASE_CLIENT_EMAIL = (copy the 'client_email' value from JSON)")
+                    raise ValueError("Firebase credentials not configured. See logs for setup instructions.")
                 
-                # Initialize Firebase
-                if cred:
-                    firebase_admin.initialize_app(cred, {'databaseURL': database_url})
-                else:
-                    # Initialize without credentials (for public databases)
-                    firebase_admin.initialize_app(options={'databaseURL': database_url})
+                logging.info("🔥 Using service account credentials from environment")
+                cred = credentials.Certificate({
+                    "type": "service_account",
+                    "project_id": "sorabotthenew",
+                    "private_key": private_key.replace('\\n', '\n'),
+                    "client_email": client_email,
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs"
+                })
+                
+                # Initialize Firebase with credentials
+                firebase_admin.initialize_app(cred, {'databaseURL': database_url})
                 
                 logging.info("🔥 Firebase Realtime Database initialized successfully")
             
