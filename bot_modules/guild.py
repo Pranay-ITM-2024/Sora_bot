@@ -46,35 +46,42 @@ class GuildJoinSelect(discord.ui.Select):
             return
         
         guild_name = self.values[0]
-        data = await load_data()
         
-        # Double-check user isn't in a guild
-        current_guild = get_user_guild(self.user_id, data)
-        if current_guild:
-            await interaction.response.send_message(f"❌ You're already in guild **{current_guild}**!", ephemeral=True)
-            return
-        
-        # Join guild
-        if "guild_members" not in data:
-            data["guild_members"] = {}
-        if guild_name not in data["guild_members"]:
-            data["guild_members"][guild_name] = []
-        
-        data["guild_members"][guild_name].append(self.user_id)
-        await save_data(data, force=True)
-        
-        embed = discord.Embed(
-            title="🏰 Joined Guild!",
-            description=f"Successfully joined guild **{guild_name}**!",
-            color=0x00ff00
-        )
-        embed.add_field(name="👥 Members", value=str(len(data["guild_members"][guild_name])), inline=True)
-        embed.add_field(name="💰 Guild Bank", value=f"{data['guilds'][guild_name].get('bank', 0):,} coins", inline=True)
-        embed.add_field(name="📈 Benefits", value="• +5% bank interest\n• Access to guild bank\n• Member collaboration", inline=False)
-        
-        # Disable the view
-        self.view.stop()
-        await interaction.response.edit_message(embed=embed, view=None)
+        try:
+            data = await load_data()
+            
+            # Double-check user isn't in a guild
+            current_guild = get_user_guild(self.user_id, data)
+            if current_guild:
+                await interaction.response.send_message(f"❌ You're already in guild **{current_guild}**!", ephemeral=True)
+                return
+            
+            # Join guild
+            if "guild_members" not in data:
+                data["guild_members"] = {}
+            if guild_name not in data["guild_members"]:
+                data["guild_members"][guild_name] = []
+            
+            data["guild_members"][guild_name].append(self.user_id)
+            await save_data(data, force=True)
+            
+            embed = discord.Embed(
+                title="🏰 Joined Guild!",
+                description=f"Successfully joined guild **{guild_name}**!",
+                color=0x00ff00
+            )
+            embed.add_field(name="👥 Members", value=str(len(data["guild_members"][guild_name])), inline=True)
+            embed.add_field(name="💰 Guild Bank", value=f"{data['guilds'][guild_name].get('bank', 0):,} coins", inline=True)
+            embed.add_field(name="📈 Benefits", value="• +5% bank interest\n• Access to guild bank\n• Member collaboration", inline=False)
+            
+            # Disable the view
+            for item in self.view.children:
+                item.disabled = True
+            
+            await interaction.response.edit_message(embed=embed, view=self.view)
+        except Exception as e:
+            print(f"Error in guild join: {e}")
+            await interaction.response.send_message(f"❌ An error occurred: {e}", ephemeral=True)
 
 class GuildJoinView(discord.ui.View):
     def __init__(self, user_id):
@@ -89,12 +96,6 @@ class GuildJoinView(discord.ui.View):
         # Disable all components when timeout occurs
         for item in self.children:
             item.disabled = True
-    
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if str(interaction.user.id) != self.user_id:
-            await interaction.response.send_message("❌ This isn't your guild selection!", ephemeral=True)
-            return False
-        return True
 
 class GuildBankView(discord.ui.View):
     def __init__(self, guild_name, user_id):
