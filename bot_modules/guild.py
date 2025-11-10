@@ -28,6 +28,74 @@ def get_guild_role(user_id, guild_name, data):
         return "Member"
     return None
 
+class GuildJoinSelect(discord.ui.Select):
+    def __init__(self, user_id):
+        self.user_id = user_id
+        
+        # This will be populated when the view is created
+        super().__init__(
+            placeholder="Choose a guild to join...",
+            min_values=1,
+            max_values=1,
+            custom_id="guild_join_select"
+        )
+    
+    async def callback(self, interaction: discord.Interaction):
+        if str(interaction.user.id) != self.user_id:
+            await interaction.response.send_message("❌ This isn't your guild selection!", ephemeral=True)
+            return
+        
+        guild_name = self.values[0]
+        data = await load_data()
+        
+        # Double-check user isn't in a guild
+        current_guild = get_user_guild(self.user_id, data)
+        if current_guild:
+            await interaction.response.send_message(f"❌ You're already in guild **{current_guild}**!", ephemeral=True)
+            return
+        
+        # Join guild
+        if "guild_members" not in data:
+            data["guild_members"] = {}
+        if guild_name not in data["guild_members"]:
+            data["guild_members"][guild_name] = []
+        
+        data["guild_members"][guild_name].append(self.user_id)
+        await save_data(data, force=True)
+        
+        embed = discord.Embed(
+            title="🏰 Joined Guild!",
+            description=f"Successfully joined guild **{guild_name}**!",
+            color=0x00ff00
+        )
+        embed.add_field(name="👥 Members", value=str(len(data["guild_members"][guild_name])), inline=True)
+        embed.add_field(name="💰 Guild Bank", value=f"{data['guilds'][guild_name].get('bank', 0):,} coins", inline=True)
+        embed.add_field(name="📈 Benefits", value="• +5% bank interest\n• Access to guild bank\n• Member collaboration", inline=False)
+        
+        # Disable the view
+        self.view.stop()
+        await interaction.response.edit_message(embed=embed, view=None)
+
+class GuildJoinView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=180)
+        self.user_id = str(user_id)
+        
+        # Add the select menu - will be populated when showing the view
+        self.select_menu = GuildJoinSelect(self.user_id)
+        self.add_item(self.select_menu)
+    
+    async def on_timeout(self):
+        # Disable all components when timeout occurs
+        for item in self.children:
+            item.disabled = True
+    
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if str(interaction.user.id) != self.user_id:
+            await interaction.response.send_message("❌ This isn't your guild selection!", ephemeral=True)
+            return False
+        return True
+
 class GuildBankView(discord.ui.View):
     def __init__(self, guild_name, user_id):
         super().__init__(timeout=300)
@@ -271,8 +339,7 @@ class Guild(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="guild_join", description="Join an existing guild!")
-    @app_commands.describe(name="Name of the guild to join")
-    async def guild_join(self, interaction: discord.Interaction, name: str):
+    async def guild_join(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
         data = await load_data()
         
@@ -282,30 +349,51 @@ class Guild(commands.Cog):
             await interaction.response.send_message(f"❌ You're already in guild **{current_guild}**! Use `/guild_leave` first.", ephemeral=True)
             return
 
-        # Check if guild exists
-        if name not in data.get("guilds", {}):
-            await interaction.response.send_message(f"❌ Guild **{name}** doesn't exist!", ephemeral=True)
+        # Get all available guilds
+        guilds = data.get("guilds", {})
+        if not guilds:
+            await interaction.response.send_message("❌ No guilds exist yet! Create one with `/guild_create`.", ephemeral=True)
             return
 
-        # Join guild
-        if "guild_members" not in data:
-            data["guild_members"] = {}
-        if name not in data["guild_members"]:
-            data["guild_members"][name] = []
-
-        data["guild_members"][name].append(user_id)
-        await save_data(data)
-
+        # Create embed with guild list
         embed = discord.Embed(
-            title="🏰 Joined Guild!",
-            description=f"Successfully joined guild **{name}**!",
-            color=0x00ff00
+            title="🏰 Join a Guild",
+            description="Select a guild from the dropdown below to join!",
+            color=0x0099ff
         )
-        embed.add_field(name="👥 Members", value=str(len(data["guild_members"][name])), inline=True)
-        embed.add_field(name="💰 Guild Bank", value=f"{data['guilds'][name].get('bank', 0):,} coins", inline=True)
-        embed.add_field(name="📈 Benefits", value="• +5% bank interest\n• Access to guild bank\n• Member collaboration", inline=False)
-
-        await interaction.response.send_message(embed=embed)
+        
+        # Add guild information to embed and create select options
+        guild_list = []
+        select_options = []
+        
+        for guild_name, guild_info in guilds.items():
+            members = data.get("guild_members", {}).get(guild_name, [])
+            bank = guild_info.get("bank", 0)
+            owner_id = guild_info.get("owner", "Unknown")
+            
+            # Add to embed display
+            guild_list.append(f"**{guild_name}** - 👥 {len(members)} members | 💰 {bank:,} coins")
+            
+            # Add to select menu options (max 25 guilds due to Discord limit)
+            if len(select_options) < 25:
+                select_options.append(
+                    discord.SelectOption(
+                        label=guild_name,
+                        description=f"{len(members)} members | {bank:,} coins",
+                        emoji="🏰"
+                    )
+                )
+        
+        if guild_list:
+            embed.add_field(name="Available Guilds", value="\n".join(guild_list[:10]), inline=False)  # Limit display to 10 to avoid embed limits
+            if len(guild_list) > 10:
+                embed.add_field(name="And more...", value=f"+{len(guild_list) - 10} more guilds available in dropdown", inline=False)
+        
+        # Create view and populate select menu
+        view = GuildJoinView(user_id)
+        view.select_menu.options = select_options
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
     @app_commands.command(name="guild_leave", description="Leave your current guild!")
     async def guild_leave(self, interaction: discord.Interaction):
