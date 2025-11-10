@@ -33,7 +33,10 @@ class HelpCog(commands.Cog):
                   "• **Slots** - 3-reel slot machine (2x-50x payouts)\n"
                   "• **Coinflip** - 50/50 chance, double your bet\n"
                   "• **Blackjack** - Classic card game vs dealer\n"
-                  "• **Rat Race** - Bet on racing rats (1.5x-3x odds)\n"
+                  "• **Rat Race** - 🏁 MULTIPLAYER live racing!\n"
+                  "  → Random rat stats, live updates, 30s betting\n"
+                  "  → Multiple players bet on same race\n"
+                  "  → 5x/2x/1.5x payouts for top 3!\n"
                   "*Item effects boost your gambling luck!*", 
             inline=False
         )

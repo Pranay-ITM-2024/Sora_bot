@@ -192,6 +192,450 @@ class SlotsView(discord.ui.View):
         view = SlotsView(user_id)
         await interaction.response.edit_message(embed=embed, view=view)
 
+# ============================================
+# RAT RACE SYSTEM - Multiplayer Live Racing
+# ============================================
+
+class RatStats:
+    """Individual rat with randomized stats"""
+    def __init__(self, rat_id, name, emoji):
+        self.id = rat_id
+        self.name = name
+        self.emoji = emoji
+        self.position = 0
+        self.forfeited = False
+        
+        # Randomized stats (0-100)
+        self.speed = random.randint(40, 100)  # Affects movement probability
+        self.stamina = random.randint(40, 100)  # Affects consistency
+        self.luck = random.randint(40, 100)  # Affects random events
+        
+    def get_stat_bar(self, stat_value):
+        """Visual stat bar"""
+        filled = int(stat_value / 10)
+        return "█" * filled + "░" * (10 - filled)
+    
+    def get_stats_display(self):
+        """Formatted stat display"""
+        return (
+            f"**Speed:** {self.get_stat_bar(self.speed)} `{self.speed}`\n"
+            f"**Stamina:** {self.get_stat_bar(self.stamina)} `{self.stamina}`\n"
+            f"**Luck:** {self.get_stat_bar(self.luck)} `{self.luck}`"
+        )
+    
+    def move(self):
+        """Calculate movement for this turn"""
+        if self.forfeited:
+            return 0
+        
+        # Base movement chance (speed affects probability)
+        speed_factor = self.speed / 100
+        stamina_factor = self.stamina / 100
+        
+        # Randomize movement (0, 1, or 2 spaces)
+        roll = random.random()
+        
+        if roll < 0.2 * stamina_factor:  # Stand still
+            return 0
+        elif roll < 0.5 + (0.3 * speed_factor):  # Move 1
+            return 1
+        else:  # Move 2
+            return 2
+
+class RatRaceLobby:
+    """Manages a single race instance"""
+    def __init__(self, host_id):
+        self.host_id = host_id
+        self.race_id = f"{host_id}_{datetime.utcnow().timestamp()}"
+        self.rats = self._generate_rats()
+        self.bets = {}  # {user_id: {"rat_id": int, "amount": int, "user_name": str}}
+        self.started = False
+        self.finished = False
+        self.finish_order = []
+        self.forfeited_rat = None
+        self.race_length = 20
+        
+    def _generate_rats(self):
+        """Generate 6 rats with random stats"""
+        rat_templates = [
+            ("Speedy", "🐭"),
+            ("Whiskers", "🐀"),
+            ("Nibbles", "🐁"),
+            ("Flash", "🐭"),
+            ("Chomper", "🐀"),
+            ("Dash", "🐁")
+        ]
+        return [RatStats(i+1, name, emoji) for i, (name, emoji) in enumerate(rat_templates)]
+    
+    def add_bet(self, user_id, user_name, rat_id, amount):
+        """Add a bet to the race"""
+        self.bets[user_id] = {
+            "rat_id": rat_id,
+            "amount": amount,
+            "user_name": user_name
+        }
+    
+    def get_rat(self, rat_id):
+        """Get rat by ID"""
+        return self.rats[rat_id - 1]
+    
+    def forfeit_random_rat(self):
+        """Randomly forfeit one rat (20% chance)"""
+        if random.random() < 0.2 and not self.forfeited_rat:
+            available_rats = [r for r in self.rats if not r.forfeited and r.position < self.race_length]
+            if available_rats:
+                rat = random.choice(available_rats)
+                rat.forfeited = True
+                self.forfeited_rat = rat.id
+                return rat
+        return None
+    
+    def move_rats(self):
+        """Move all rats one turn"""
+        for rat in self.rats:
+            if not rat.forfeited and rat.position < self.race_length:
+                movement = rat.move()
+                rat.position += movement
+                
+                # Check if finished
+                if rat.position >= self.race_length and rat.id not in self.finish_order:
+                    self.finish_order.append(rat.id)
+        
+        # Check if race is over (top 3 finished or all rats done)
+        if len(self.finish_order) >= 3 or all(r.position >= self.race_length or r.forfeited for r in self.rats):
+            self.finished = True
+    
+    def get_track_visual(self):
+        """Generate visual race track"""
+        track_lines = []
+        for rat in self.rats:
+            # Get bettors on this rat
+            bettors = [b["user_name"] for uid, b in self.bets.items() if b["rat_id"] == rat.id]
+            bettor_text = f" 💰{len(bettors)}" if bettors else ""
+            
+            if rat.forfeited:
+                track = f"{rat.emoji} ❌ **FORFEITED** - {rat.name}{bettor_text}"
+            else:
+                pos = min(rat.position, self.race_length)
+                track_bar = "▓" * pos + rat.emoji + "░" * (self.race_length - pos)
+                status = " 🏆" if rat.id in self.finish_order else ""
+                track = f"`{track_bar}` **{rat.name}**{status}{bettor_text}"
+            
+            track_lines.append(track)
+        
+        return "\n".join(track_lines)
+    
+    def calculate_payouts(self):
+        """Calculate winnings for all bettors"""
+        payouts = {}  # {user_id: amount}
+        
+        for user_id, bet_info in self.bets.items():
+            rat_id = bet_info["rat_id"]
+            bet_amount = bet_info["amount"]
+            
+            # Check placement
+            if rat_id in self.finish_order:
+                placement = self.finish_order.index(rat_id) + 1
+                
+                if placement == 1:
+                    winnings = bet_amount * 5
+                elif placement == 2:
+                    winnings = bet_amount * 2
+                elif placement == 3:
+                    winnings = int(bet_amount * 1.5)
+                else:
+                    winnings = 0
+                
+                payouts[user_id] = {
+                    "bet": bet_amount,
+                    "winnings": winnings,
+                    "net": winnings - bet_amount,
+                    "placement": placement
+                }
+            else:
+                # Lost
+                payouts[user_id] = {
+                    "bet": bet_amount,
+                    "winnings": 0,
+                    "net": -bet_amount,
+                    "placement": None
+                }
+        
+        return payouts
+
+# Global race lobbies
+active_race_lobbies = {}
+
+class RatRaceStartView(discord.ui.View):
+    """Initial view to start a race"""
+    def __init__(self):
+        super().__init__(timeout=300)
+    
+    @discord.ui.button(label="Start New Race", style=discord.ButtonStyle.primary, emoji="🏁")
+    async def start_race(self, interaction: discord.Interaction, button: discord.ui.Button):
+        user_id = str(interaction.user.id)
+        
+        # Create new lobby
+        lobby = RatRaceLobby(user_id)
+        active_race_lobbies[lobby.race_id] = lobby
+        
+        # Show betting interface
+        view = RatRaceBettingView(lobby)
+        embed = self._create_lobby_embed(lobby, interaction.user.display_name)
+        
+        await interaction.response.edit_message(embed=embed, view=view)
+        
+        # Start countdown timer
+        await asyncio.sleep(30)
+        
+        # Start race if there are bets
+        if lobby.race_id in active_race_lobbies and lobby.bets:
+            await self._start_race_sequence(interaction, lobby)
+        elif lobby.race_id in active_race_lobbies:
+            # No bets, cancel race
+            del active_race_lobbies[lobby.race_id]
+            cancel_embed = discord.Embed(
+                title="❌ Race Cancelled",
+                description="No bets were placed. Race has been cancelled.",
+                color=0xe74c3c
+            )
+            await interaction.edit_original_response(embed=cancel_embed, view=None)
+    
+    def _create_lobby_embed(self, lobby, host_name):
+        """Create the betting lobby embed"""
+        embed = discord.Embed(
+            title="🏁 RAT RACE - Betting Open!",
+            description=f"**Host:** {host_name}\n**Race ID:** `{lobby.race_id[-8:]}`\n\n⏰ **30 seconds to place bets!**",
+            color=0xffc300
+        )
+        
+        # Show rat stats
+        for rat in lobby.rats:
+            embed.add_field(
+                name=f"{rat.emoji} #{rat.id} - {rat.name}",
+                value=rat.get_stats_display(),
+                inline=True
+            )
+        
+        # Show current bets
+        if lobby.bets:
+            bet_list = "\n".join([
+                f"• **{b['user_name']}** bet **{b['amount']}** on **Rat #{b['rat_id']}**"
+                for b in lobby.bets.values()
+            ])
+            embed.add_field(name="💰 Current Bets", value=bet_list, inline=False)
+        else:
+            embed.add_field(name="💰 Current Bets", value="*No bets yet...*", inline=False)
+        
+        embed.set_footer(text="Select a rat and enter your bet below!")
+        return embed
+    
+    async def _start_race_sequence(self, interaction, lobby):
+        """Run the live race sequence"""
+        lobby.started = True
+        
+        # Deduct all bets
+        data = await load_data()
+        for user_id, bet_info in lobby.bets.items():
+            user_coins = data.get("coins", {}).get(user_id, 0)
+            data.setdefault("coins", {})[user_id] = user_coins - bet_info["amount"]
+            add_transaction(user_id, bet_info["amount"], "Rat race bet", data, "debit")
+        await save_data(data, force=True)
+        
+        # Starting embed
+        start_embed = discord.Embed(
+            title="🏁 RAT RACE - STARTING!",
+            description="🚦 **3... 2... 1... GO!**",
+            color=0x3498db
+        )
+        await interaction.edit_original_response(embed=start_embed, view=None)
+        await asyncio.sleep(2)
+        
+        # Race loop
+        turn = 0
+        while not lobby.finished:
+            turn += 1
+            lobby.move_rats()
+            
+            # Check for forfeit (only once per race)
+            forfeited = lobby.forfeit_random_rat()
+            forfeit_text = f"\n\n⚠️ **{forfeited.emoji} {forfeited.name} has forfeited!**" if forfeited else ""
+            
+            # Create race update embed
+            race_embed = discord.Embed(
+                title=f"🏁 RAT RACE - Turn {turn}",
+                description=f"**Live Race in Progress!**{forfeit_text}\n\n{lobby.get_track_visual()}",
+                color=0x3498db
+            )
+            
+            # Show finish order if any
+            if lobby.finish_order:
+                positions = []
+                for i, rat_id in enumerate(lobby.finish_order[:3]):
+                    rat = lobby.get_rat(rat_id)
+                    medal = ["🥇", "🥈", "🥉"][i]
+                    positions.append(f"{medal} {rat.emoji} **{rat.name}**")
+                race_embed.add_field(name="🏆 Finished", value="\n".join(positions), inline=False)
+            
+            race_embed.set_footer(text=f"🎯 Race Length: {lobby.race_length} spaces")
+            
+            await interaction.edit_original_response(embed=race_embed)
+            await asyncio.sleep(2)  # 2 second delay between turns
+        
+        # Race finished - show results and pay out
+        await self._show_results(interaction, lobby)
+    
+    async def _show_results(self, interaction, lobby):
+        """Show final results and distribute winnings"""
+        data = await load_data()
+        payouts = lobby.calculate_payouts()
+        
+        # Distribute winnings
+        for user_id, payout_info in payouts.items():
+            if payout_info["winnings"] > 0:
+                current_coins = data.get("coins", {}).get(user_id, 0)
+                data.setdefault("coins", {})[user_id] = current_coins + payout_info["winnings"]
+                add_transaction(user_id, payout_info["winnings"], f"Rat race win (Place {payout_info['placement']})", data, "credit")
+        
+        await save_data(data, force=True)
+        
+        # Create results embed
+        results_embed = discord.Embed(
+            title="🏁 RAT RACE - FINISHED!",
+            description="**Final Results**",
+            color=0x27ae60
+        )
+        
+        # Show final track
+        results_embed.add_field(name="📊 Final Track", value=lobby.get_track_visual(), inline=False)
+        
+        # Show winners
+        if lobby.finish_order:
+            positions = []
+            for i, rat_id in enumerate(lobby.finish_order[:3]):
+                rat = lobby.get_rat(rat_id)
+                medal = ["🥇 1st", "🥈 2nd", "🥉 3rd"][i]
+                multiplier = ["5x", "2x", "1.5x"][i]
+                positions.append(f"{medal} - {rat.emoji} **{rat.name}** ({multiplier})")
+            results_embed.add_field(name="🏆 Podium", value="\n".join(positions), inline=False)
+        
+        # Show payouts
+        payout_lines = []
+        for user_id, payout_info in payouts.items():
+            bet_data = lobby.bets[user_id]
+            rat = lobby.get_rat(bet_data["rat_id"])
+            
+            if payout_info["net"] > 0:
+                result_emoji = "💰"
+                result_text = f"+{payout_info['net']} coins"
+            else:
+                result_emoji = "❌"
+                result_text = f"{payout_info['net']} coins"
+            
+            payout_lines.append(
+                f"{result_emoji} **{bet_data['user_name']}** - {rat.emoji} Rat #{rat.id} - {result_text}"
+            )
+        
+        results_embed.add_field(name="💵 Payouts", value="\n".join(payout_lines), inline=False)
+        results_embed.set_footer(text="Thanks for racing! Start another race anytime! 🏁")
+        
+        await interaction.edit_original_response(embed=results_embed)
+        
+        # Cleanup lobby
+        if lobby.race_id in active_race_lobbies:
+            del active_race_lobbies[lobby.race_id]
+
+class RatRaceBettingView(discord.ui.View):
+    """View for placing bets during betting phase"""
+    def __init__(self, lobby):
+        super().__init__(timeout=30)
+        self.lobby = lobby
+        
+        # Add rat selection dropdown
+        options = [
+            discord.SelectOption(
+                label=f"Rat #{rat.id} - {rat.name}",
+                value=str(rat.id),
+                emoji=rat.emoji,
+                description=f"Speed: {rat.speed} | Stamina: {rat.stamina} | Luck: {rat.luck}"
+            )
+            for rat in lobby.rats
+        ]
+        
+        select = discord.ui.Select(
+            placeholder="Choose your rat...",
+            options=options,
+            custom_id="rat_select"
+        )
+        select.callback = self.rat_selected
+        self.add_item(select)
+        
+        self.selected_rat = None
+    
+    async def rat_selected(self, interaction: discord.Interaction):
+        """Handle rat selection"""
+        self.selected_rat = int(interaction.data["values"][0])
+        
+        # Show bet amount modal
+        modal = BetAmountModal(self.lobby, self.selected_rat)
+        await interaction.response.send_modal(modal)
+
+class BetAmountModal(discord.ui.Modal, title="Place Your Bet"):
+    """Modal for entering bet amount"""
+    def __init__(self, lobby, rat_id):
+        super().__init__()
+        self.lobby = lobby
+        self.rat_id = rat_id
+        
+        self.bet_input = discord.ui.TextInput(
+            label="Bet Amount",
+            placeholder="Enter amount of coins to bet...",
+            required=True,
+            min_length=1,
+            max_length=10
+        )
+        self.add_item(self.bet_input)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            bet_amount = int(self.bet_input.value)
+        except ValueError:
+            await interaction.response.send_message("❌ Please enter a valid number!", ephemeral=True)
+            return
+        
+        if bet_amount < 10:
+            await interaction.response.send_message("❌ Minimum bet is 10 coins!", ephemeral=True)
+            return
+        
+        user_id = str(interaction.user.id)
+        data = await load_data()
+        
+        # Check balance
+        user_coins = data.get("coins", {}).get(user_id, 0)
+        if user_coins < bet_amount:
+            await interaction.response.send_message(
+                f"❌ You don't have enough coins! Balance: {user_coins}",
+                ephemeral=True
+            )
+            return
+        
+        # Check if already bet
+        if user_id in self.lobby.bets:
+            await interaction.response.send_message(
+                "❌ You already placed a bet on this race!",
+                ephemeral=True
+            )
+            return
+        
+        # Add bet
+        rat = self.lobby.get_rat(self.rat_id)
+        self.lobby.add_bet(user_id, interaction.user.display_name, self.rat_id, bet_amount)
+        
+        await interaction.response.send_message(
+            f"✅ Bet placed! **{bet_amount} coins** on {rat.emoji} **{rat.name}**\nGood luck! 🍀",
+            ephemeral=True
+        )
+
 class BlackjackView(discord.ui.View):
     def __init__(self, user_id, bet, player_hand, dealer_hand, deck):
         super().__init__(timeout=300)
@@ -521,112 +965,41 @@ class Casino(commands.Cog):
             await save_data(data)
             await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-    @app_commands.command(name="ratrace", description="Bet on rat races with lucky coin bonus!")
-    @app_commands.describe(bet="Amount to bet", rat="Choose your rat (1-6)")
-    @app_commands.choices(rat=[
-        app_commands.Choice(name="Rat 1 🐭", value=1),
-        app_commands.Choice(name="Rat 2 🐀", value=2),
-        app_commands.Choice(name="Rat 3 🐁", value=3),
-        app_commands.Choice(name="Rat 4 🐭", value=4),
-        app_commands.Choice(name="Rat 5 🐀", value=5),
-        app_commands.Choice(name="Rat 6 🐁", value=6)
-    ])
-    async def ratrace(self, interaction: discord.Interaction, bet: int, rat: int):
-        user_id = str(interaction.user.id)
+    @app_commands.command(name="ratrace", description="🏁 Start or join a multiplayer rat race!")
+    async def ratrace(self, interaction: discord.Interaction):
+        """Start a new multiplayer rat race"""
+        view = RatRaceStartView()
+        embed = discord.Embed(
+            title="🏁 RAT RACE - Multiplayer Betting",
+            description="**Welcome to the Rat Racing Arena!**\n\nClick **Start New Race** to begin!\nOther players can join and bet on the same race.",
+            color=0xffc300
+        )
+        embed.add_field(
+            name="� How It Works",
+            value=(
+                "• Host starts a race with 6 random rats\n"
+                "• Each rat has unique randomized stats\n"
+                "• Multiple players can bet on different rats\n"
+                "• Race runs live with real-time updates\n"
+                "• Rats move 0-2 spaces per turn\n"
+                "• One random rat may forfeit each race\n"
+                "• First to finish line (20 spaces) wins!"
+            ),
+            inline=False
+        )
+        embed.add_field(
+            name="💰 Payouts",
+            value="🥇 1st Place: **5x** your bet\n🥈 2nd Place: **2x** your bet\n🥉 3rd Place: **1.5x** your bet",
+            inline=True
+        )
+        embed.add_field(
+            name="⏱️ Betting Phase",
+            value="30 seconds to place bets\nRace starts automatically",
+            inline=True
+        )
+        embed.set_footer(text="💡 Tip: Watch rat stats when betting!")
         
-        if bet < 1:
-            await interaction.response.send_message("❌ Minimum bet is 1 coin!", ephemeral=True)
-            return
-        
-        data = await load_data()
-        
-        # Check cooldown
-        cooldown = check_cooldown(user_id, "ratrace", data, 25)
-        if cooldown > 0:
-            await interaction.response.send_message(f"⏰ Cooldown active! Wait {cooldown} seconds.", ephemeral=True)
-            return
-        
-        user_coins = data.get("coins", {}).get(user_id, 0)
-        if user_coins < bet:
-            await interaction.response.send_message(f"❌ You need {bet} coins! Your balance: {user_coins}", ephemeral=True)
-            return
-        
-        # Get effects
-        effects = await get_gambling_effects(user_id, data)
-        
-        # Check for lucky coin bonus (rat race specific)
-        equipment = data.get("equipment", {}).get(user_id, {})
-        has_lucky_coin = equipment.get("accessory") == "lucky_coin"
-        
-        # Simulate race
-        rat_names = ["🐭 Squeaky", "🐀 Whiskers", "🐁 Nibbles", "🐭 Speedy", "🐀 Chomper", "🐁 Dash"]
-        winner = random.randint(1, 6)
-        
-        # Apply lucky coin effect
-        if has_lucky_coin and random.random() < 0.05:  # 5% bonus chance
-            winner = rat
-        
-        if rat == winner:
-            winnings = bet * 6  # 6:1 payout
-            if has_lucky_coin:
-                bonus = int(winnings * 0.05)  # 5% bonus
-                winnings += bonus
-            net_result = winnings - bet
-            result_text = f"🎉 {rat_names[rat-1]} wins the race!"
-            if has_lucky_coin:
-                result_text += f"\n🪙 Lucky coin bonus: +{bonus} coins!"
-            color = 0x27ae60
-        else:
-            winnings = 0
-            net_result = -bet
-            result_text = f"😔 {rat_names[winner-1]} won the race!"
-            color = 0xe74c3c
-            
-            # Apply insurance
-            if effects["insurance"]:
-                refund = bet // 2
-                net_result += refund
-                result_text += f"\n🛡️ Insurance activated! Refunded {refund} coins"
-                await consume_item_effect(user_id, "insurance_scroll", data)
-        
-        # Update balance
-        data.setdefault("coins", {})[user_id] = user_coins + net_result
-        
-        # Add transaction
-        if net_result > 0:
-            add_transaction(user_id, net_result, "Rat race win", data, "credit")
-        else:
-            add_transaction(user_id, abs(net_result), "Rat race loss", data, "debit")
-        
-        set_cooldown(user_id, "ratrace", data)
-        await save_data(data)
-        
-        # Create race visualization
-        race_track = "🏁" + "━" * 10 + "🏁"
-        rat_positions = [random.randint(1, 8) for _ in range(6)]
-        rat_positions[winner-1] = 10  # Winner at finish line
-        
-        race_visual = []
-        for i, pos in enumerate(rat_positions):
-            track = "━" * pos + rat_names[i].split()[0] + "━" * (10-pos)
-            if i == rat-1:  # User's rat
-                track = track.replace("━", "═")  # Highlight user's rat
-            race_visual.append(track)
-        
-        embed = discord.Embed(title="🏁 Rat Race Results", color=color)
-        embed.add_field(name="Race Track", value="🏁" + "\n🏁".join(race_visual) + "\n🏁", inline=False)
-        embed.add_field(name="Your Rat", value=rat_names[rat-1], inline=True)
-        embed.add_field(name="Winner", value=rat_names[winner-1], inline=True)
-        embed.add_field(name="Outcome", value="WIN" if rat == winner else "LOSS", inline=True)
-        embed.add_field(name="Bet", value=f"{bet} coins", inline=True)
-        embed.add_field(name="Net", value=f"{'+'if net_result >= 0 else ''}{net_result} coins", inline=True)
-        embed.add_field(name="Balance", value=f"{user_coins + net_result:,} coins", inline=True)
-        embed.description = result_text
-        
-        if has_lucky_coin:
-            embed.set_footer(text="🪙 Lucky Coin equipped - bonus chances active!")
-        
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed, view=view)
 
 async def setup(bot):
     await bot.add_cog(Casino(bot))
