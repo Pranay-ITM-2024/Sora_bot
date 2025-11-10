@@ -657,7 +657,26 @@ class Casino(commands.Cog):
             await interaction.response.send_message("❌ Minimum bet is 10 coins!", ephemeral=True)
             return
         
-        # Simple roulette logic (placeholder)
+        user = interaction.user
+        data = await load_data()
+        
+        # Initialize user data
+        if str(user.id) not in data["coins"]:
+            data["coins"][str(user.id)] = 0
+        
+        # Check if user has enough coins
+        if data["coins"][str(user.id)] < bet:
+            await interaction.response.send_message(
+                f"❌ You don't have enough coins! You need {bet} coins but only have {data['coins'][str(user.id)]}.",
+                ephemeral=True
+            )
+            return
+        
+        # Deduct bet
+        data["coins"][str(user.id)] -= bet
+        add_transaction(user.id, bet, "Roulette bet", data, tx_type="debit")
+        
+        # Roulette logic
         result = random.randint(0, 36)
         color = "green" if result == 0 else "red" if result % 2 == 1 else "black"
         
@@ -671,15 +690,29 @@ class Casino(commands.Cog):
             won = True
             payout = bet * 35
         
+        # Add winnings
+        if won:
+            data["coins"][str(user.id)] += payout
+            add_transaction(user.id, payout, "Roulette win", data, tx_type="credit")
+        
+        # Save data
+        await save_data(data, force=True)
+        
         embed = discord.Embed(
             title="🎯 Roulette Result", 
             color=0x00ff00 if won else 0xff0000
         )
         embed.add_field(name="Result", value=f"{result} ({color})", inline=True)
         embed.add_field(name="Your Bet", value=f"{bet} on {choice}", inline=True)
-        embed.add_field(name="Outcome", value=f"{'Won' if won else 'Lost'} {payout if won else bet} coins", inline=True)
         
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        if won:
+            embed.add_field(name="Outcome", value=f"✅ Won {payout} coins!", inline=True)
+            embed.add_field(name="New Balance", value=f"💰 {data['coins'][str(user.id)]} coins", inline=False)
+        else:
+            embed.add_field(name="Outcome", value=f"❌ Lost {bet} coins", inline=True)
+            embed.add_field(name="New Balance", value=f"💰 {data['coins'][str(user.id)]} coins", inline=False)
+        
+        await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="slots", description="Spin the slot machine.")
     @app_commands.describe(bet="Amount to bet on slots")
@@ -688,7 +721,26 @@ class Casino(commands.Cog):
             await interaction.response.send_message("❌ Minimum bet is 10 coins!", ephemeral=True)
             return
         
-        # Simple slots logic
+        user = interaction.user
+        data = await load_data()
+        
+        # Initialize user data
+        if str(user.id) not in data["coins"]:
+            data["coins"][str(user.id)] = 0
+        
+        # Check if user has enough coins
+        if data["coins"][str(user.id)] < bet:
+            await interaction.response.send_message(
+                f"❌ You don't have enough coins! You need {bet} coins but only have {data['coins'][str(user.id)]}.",
+                ephemeral=True
+            )
+            return
+        
+        # Deduct bet
+        data["coins"][str(user.id)] -= bet
+        add_transaction(user.id, bet, "Slots bet", data, tx_type="debit")
+        
+        # Slots logic
         symbols = ["🍒", "🍋", "🍊", "🍇", "🔔", "💎", "🍀"]
         result = [random.choice(symbols) for _ in range(3)]
         
@@ -704,18 +756,31 @@ class Casino(commands.Cog):
         elif result[0] == result[1] or result[1] == result[2]:  # Double match
             payout = bet * 2
         
+        # Add winnings
+        if payout > 0:
+            data["coins"][str(user.id)] += payout
+            add_transaction(user.id, payout, "Slots win", data, tx_type="credit")
+        
+        # Save data
+        await save_data(data, force=True)
+        
         embed = discord.Embed(
             title="🎰 Slot Machine", 
             color=0x00ff00 if payout > 0 else 0xff0000
         )
         embed.add_field(name="Result", value=" ".join(result), inline=False)
         embed.add_field(name="Bet", value=f"{bet} coins", inline=True)
-        embed.add_field(name="Payout", value=f"{payout} coins" if payout > 0 else "0 coins", inline=True)
         
-        if payout >= bet * 25:
-            embed.add_field(name="🎉 JACKPOT!", value="Amazing win!", inline=False)
+        if payout > 0:
+            embed.add_field(name="Payout", value=f"✅ Won {payout} coins!", inline=True)
+            if payout >= bet * 25:
+                embed.add_field(name="🎉 JACKPOT!", value="Amazing win!", inline=False)
+        else:
+            embed.add_field(name="Payout", value=f"❌ Lost {bet} coins", inline=True)
         
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        embed.add_field(name="New Balance", value=f"💰 {data['coins'][str(user.id)]} coins", inline=False)
+        
+        await interaction.response.send_message(embed=embed)
 
     # Add more game commands here
 
