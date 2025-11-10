@@ -1,11 +1,9 @@
 """
-Casino module: slots, coinflip, blackjack, roulette, diceroll, ratrace with full item effects
+Casino module: slots, coinflip, blackjack, roulette, ratrace with full item effects
 """
 import discord
 from discord import app_commands
 from discord.ext import commands
-import json
-from pathlib import Path
 import asyncio
 import random
 from datetime import datetime, timedelta
@@ -793,6 +791,91 @@ class BlackjackView(discord.ui.View):
 class Casino(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+
+    @app_commands.command(name="casino", description="Open the casino hub.")
+    async def casino(self, interaction: discord.Interaction):
+        embed = discord.Embed(title="🎰 Casino Hub", description="Welcome to the casino! Choose your game:", color=0xffc300)
+        embed.add_field(name="🎯 Roulette", value="`/roulette` - Spin the wheel of fortune!", inline=False)
+        embed.add_field(name="🎰 Slots", value="`/slots` - Try your luck on the slot machine!", inline=False)
+        embed.add_field(name="🪙 Coinflip", value="`/coinflip` - Double or nothing!", inline=False)
+        embed.add_field(name="🃏 Blackjack", value="`/blackjack` - Beat the dealer at 21!", inline=False)
+        embed.add_field(name="🏁 Rat Race", value="`/ratrace` - Multiplayer live racing!", inline=False)
+        embed.set_footer(text="💡 Tip: Use items like luck_potion to boost your chances!")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="roulette", description="Spin the roulette wheel!")
+    @app_commands.describe(bet="Amount to bet", choice="red, black, green, or a number (0-36)")
+    async def roulette(self, interaction: discord.Interaction, bet: int, choice: str):
+        if bet < 10:
+            await interaction.response.send_message("❌ Minimum bet is 10 coins!", ephemeral=True)
+            return
+        
+        user_id = str(interaction.user.id)
+        data = await load_data()
+        
+        # Initialize and check balance
+        user_coins = data.get("coins", {}).get(user_id, 0)
+        if user_coins < bet:
+            await interaction.response.send_message(
+                f"❌ You don't have enough coins! You need {bet} coins but only have {user_coins}.",
+                ephemeral=True
+            )
+            return
+        
+        # Deduct bet
+        data.setdefault("coins", {})[user_id] = user_coins - bet
+        add_transaction(user_id, bet, "Roulette bet", data, tx_type="debit")
+        
+        # Get gambling effects
+        effects = await get_gambling_effects(user_id, data)
+        
+        # Roulette logic
+        result = random.randint(0, 36)
+        color = "green" if result == 0 else "red" if result % 2 == 1 else "black"
+        
+        won = False
+        payout = 0
+        
+        # Check win conditions
+        choice_lower = choice.lower()
+        if choice_lower == color:
+            won = True
+            payout = bet * 2
+        elif choice_lower.isdigit() and int(choice_lower) == result:
+            won = True
+            payout = bet * 35
+        
+        # Apply gambling effects
+        if won and payout > 0:
+            payout = int(payout * (1 + effects["payout_bonus"]))
+            data["coins"][user_id] += payout
+            add_transaction(user_id, payout, "Roulette win", data, tx_type="credit")
+            
+            # Consume luck potions on win
+            if effects["payout_bonus"] > 0:
+                await consume_item_effect(user_id, "luck_potion", data)
+        
+        # Save data
+        await save_data(data, force=True)
+        
+        # Create embed
+        embed = discord.Embed(
+            title="🎯 Roulette Result", 
+            color=0x00ff00 if won else 0xff0000
+        )
+        embed.add_field(name="Spin Result", value=f"**{result}** ({color})", inline=True)
+        embed.add_field(name="Your Bet", value=f"{bet} on {choice}", inline=True)
+        
+        if won:
+            embed.add_field(name="Outcome", value=f"✅ Won {payout:,} coins!", inline=False)
+            if effects["payout_bonus"] > 0:
+                embed.add_field(name="🍀 Luck Bonus", value=f"+{effects['payout_bonus']*100:.0f}% payout", inline=True)
+        else:
+            embed.add_field(name="Outcome", value=f"❌ Lost {bet:,} coins", inline=False)
+        
+        embed.add_field(name="New Balance", value=f"💰 {data['coins'][user_id]:,} coins", inline=False)
+        
+        await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="slots", description="Play slot machine with item bonuses!")
     @app_commands.describe(bet="Amount to bet (default: 10)")

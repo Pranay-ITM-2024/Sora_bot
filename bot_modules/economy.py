@@ -1,14 +1,11 @@
 """
 Economy module: balance, daily, weekly, pay, request, rob, bank, profile
 """
-import json
 import discord
 from discord import app_commands
 from discord.ext import commands
-from pathlib import Path
 from datetime import datetime, timedelta
 import random
-import asyncio
 from .database import load_data, save_data
 
 def get_rarity_color(rarity):

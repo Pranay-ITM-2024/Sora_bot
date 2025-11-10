@@ -30,6 +30,7 @@ class HelpCog(commands.Cog):
         embed.add_field(
             name="🎰 Casino Games", 
             value="`/casino` - Interactive casino hub with:\n"
+                  "• **Roulette** - Spin the wheel! Bet on colors/numbers\n"
                   "• **Slots** - 3-reel slot machine (2x-50x payouts)\n"
                   "• **Coinflip** - 50/50 chance, double your bet\n"
                   "• **Blackjack** - Classic card game vs dealer\n"
