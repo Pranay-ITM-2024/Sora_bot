@@ -33,31 +33,44 @@ async def get_gambling_effects(user_id, data):
     bonuses = {
         "win_chance_bonus": 0.0,
         "payout_bonus": 0.0,
-        "insurance": False
+        "insurance": False,
+        "active_items": []
     }
     
-    # Check consumables
+    # Check consumables (potions)
     consumables = data.get("consumable_effects", {}).get(user_id, {})
-    if "lucky_potion" in consumables:
-        bonuses["win_chance_bonus"] += 0.2  # +20%
+    
+    # luck_potion from shop: +20% winnings
+    if "luck_potion" in consumables:
+        bonuses["payout_bonus"] += 0.2  # +20% winnings
+        bonuses["active_items"].append("🍀 Luck Potion")
+    
+    # Legacy items for backward compatibility
     if "mega_lucky_potion" in consumables:
         bonuses["win_chance_bonus"] += 0.5  # +50%
+        bonuses["active_items"].append("🍀 Mega Luck Potion")
     if "jackpot_booster" in consumables:
         bonuses["payout_bonus"] += 0.1  # +10%
+        bonuses["active_items"].append("💎 Jackpot Booster")
     if "insurance_scroll" in consumables:
         bonuses["insurance"] = True
+        bonuses["active_items"].append("🛡️ Insurance")
     
-    # Check equipment
+    # Check equipped items
     equipment = data.get("equipment", {}).get(user_id, {})
     
-    if "accessory" in equipment:
-        item = equipment["accessory"]
-        if item == "gamblers_charm":
-            bonuses["win_chance_bonus"] += 0.05  # +5%
-        elif item == "golden_dice":
-            bonuses["payout_bonus"] += 0.1  # +10%
-        elif item == "lucky_coin":
-            bonuses["win_chance_bonus"] += 0.05  # +5% (rat race specific)
+    # lucky_charm from shop: +10% casino winnings (permanent when equipped)
+    if equipment.get("accessory") == "lucky_charm":
+        bonuses["payout_bonus"] += 0.1  # +10% winnings
+        bonuses["active_items"].append("🔮 Lucky Charm")
+    
+    # Legacy equipment for backward compatibility
+    if equipment.get("accessory") == "gamblers_charm":
+        bonuses["win_chance_bonus"] += 0.05  # +5%
+        bonuses["active_items"].append("🎲 Gamblers Charm")
+    elif equipment.get("accessory") == "golden_dice":
+        bonuses["payout_bonus"] += 0.1  # +10%
+        bonuses["active_items"].append("🎲 Golden Dice")
     
     return bonuses
 
@@ -67,14 +80,12 @@ async def consume_item_effect(user_id, item_key, data):
     consumables = data.get("consumable_effects", {}).get(user_id, {})
     
     if item_key in consumables:
-        consumables[item_key] -= 1
-        if consumables[item_key] <= 0:
-            del consumables[item_key]
+        # Remove the effect (it's been used)
+        del consumables[item_key]
         
         if not consumables:
             data.get("consumable_effects", {}).pop(user_id, None)
         
-        await save_data(data)
         return True
     return False
 
@@ -150,9 +161,10 @@ class SlotsView(discord.ui.View):
                 winnings += bonus_amount
                 win_text += f"\n💰 Item bonus: +{bonus_amount} coins!"
             
-            # Consume jackpot booster if used
-            if effects["payout_bonus"] > 0:
-                await consume_item_effect(user_id, "jackpot_booster", data)
+            # Consume potions/boosters if used (only on win)
+            await consume_item_effect(user_id, "luck_potion", data)
+            await consume_item_effect(user_id, "jackpot_booster", data)
+            await consume_item_effect(user_id, "mega_lucky_potion", data)
         
         # Handle loss with insurance
         net_result = winnings - bet
@@ -170,11 +182,6 @@ class SlotsView(discord.ui.View):
             add_transaction(user_id, net_result, f"Slots win (+{winnings-bet})", data, "credit")
         else:
             add_transaction(user_id, abs(net_result), f"Slots loss (-{abs(net_result)})", data, "debit")
-        
-        # Consume luck potions
-        if effects["win_chance_bonus"] > 0:
-            await consume_item_effect(user_id, "lucky_potion", data)
-            await consume_item_effect(user_id, "mega_lucky_potion", data)
         
         await save_data(data)
         

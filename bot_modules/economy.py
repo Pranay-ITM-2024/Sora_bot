@@ -201,8 +201,41 @@ class Economy(commands.Cog):
                 )
                 return
         
+        # Check for item bonuses
+        bonuses = []
+        multiplier = 1.0
+        
+        # Check equipped items (piggy_bank gives +15%)
+        equipped = data.get("equipment", {}).get(user_id, {})
+        if equipped.get("accessory") == "piggy_bank":
+            multiplier += 0.15
+            bonuses.append("🐷 Piggy Bank: +15%")
+        
+        # Check consumable effects (wealth_potion gives +100%)
+        consumable_effects = data.get("consumable_effects", {}).get(user_id, {})
+        if "wealth_potion" in consumable_effects:
+            multiplier += 1.0
+            bonuses.append("💰 Wealth Potion: +100%")
+            # Consume the potion
+            consumable_effects.pop("wealth_potion")
+            if not consumable_effects:
+                data["consumable_effects"].pop(user_id, None)
+        
+        # Check xp_boost (+50% all earnings)
+        if "xp_boost" in consumable_effects:
+            multiplier += 0.5
+            bonuses.append("⭐ XP Boost: +50%")
+            # Consume the boost
+            consumable_effects.pop("xp_boost")
+            if not consumable_effects:
+                data["consumable_effects"].pop(user_id, None)
+        
+        # Apply multiplier
+        final_amount = int(daily_amount * multiplier)
+        bonus_amount = final_amount - daily_amount
+        
         # Update balance
-        coins = data.get("coins", {}).get(user_id, 0) + daily_amount
+        coins = data.get("coins", {}).get(user_id, 0) + final_amount
         data.setdefault("coins", {})[user_id] = coins
         data.setdefault("last_daily", {})[user_id] = now.strftime("%Y-%m-%d")
         
@@ -210,16 +243,24 @@ class Economy(commands.Cog):
         tx = {
             "time": now.strftime("%Y-%m-%d %H:%M:%S UTC"), 
             "type": "credit", 
-            "amount": daily_amount, 
-            "reason": "Daily claim"
+            "amount": final_amount, 
+            "reason": "Daily claim" + (f" (+{bonus_amount} bonus)" if bonus_amount > 0 else "")
         }
         data.setdefault("transactions", {}).setdefault(user_id, []).append(tx)
         
-        await save_data(data)
+        await save_data(data, force=True)
         
-        embed = discord.Embed(title="Daily Reward Claimed!", color=0x00ff99)
-        embed.add_field(name="Amount", value=f"{daily_amount:,} coins", inline=True)
-        embed.add_field(name="New Balance", value=f"{coins:,} coins", inline=True)
+        embed = discord.Embed(title="💰 Daily Reward Claimed!", color=0x00ff99)
+        embed.add_field(name="Base Amount", value=f"{daily_amount:,} coins", inline=True)
+        if bonus_amount > 0:
+            embed.add_field(name="Bonus", value=f"+{bonus_amount:,} coins", inline=True)
+            embed.add_field(name="Total Received", value=f"**{final_amount:,} coins**", inline=True)
+            if bonuses:
+                embed.add_field(name="🎁 Active Bonuses", value="\n".join(bonuses), inline=False)
+        else:
+            embed.add_field(name="Total Received", value=f"{final_amount:,} coins", inline=True)
+        embed.add_field(name="New Balance", value=f"💵 {coins:,} coins", inline=False)
+        embed.set_footer(text="💡 Tip: Equip Piggy Bank or use Wealth Potion for bonuses!")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="weekly", description="Claim your weekly reward.")
@@ -245,8 +286,41 @@ class Economy(commands.Cog):
                 )
                 return
         
+        # Check for item bonuses
+        bonuses = []
+        multiplier = 1.0
+        
+        # Check equipped items (piggy_bank gives +15%)
+        equipped = data.get("equipment", {}).get(user_id, {})
+        if equipped.get("accessory") == "piggy_bank":
+            multiplier += 0.15
+            bonuses.append("🐷 Piggy Bank: +15%")
+        
+        # Check consumable effects (wealth_potion gives +100%)
+        consumable_effects = data.get("consumable_effects", {}).get(user_id, {})
+        if "wealth_potion" in consumable_effects:
+            multiplier += 1.0
+            bonuses.append("💰 Wealth Potion: +100%")
+            # Consume the potion
+            consumable_effects.pop("wealth_potion")
+            if not consumable_effects:
+                data["consumable_effects"].pop(user_id, None)
+        
+        # Check xp_boost (+50% all earnings)
+        if "xp_boost" in consumable_effects:
+            multiplier += 0.5
+            bonuses.append("⭐ XP Boost: +50%")
+            # Consume the boost
+            consumable_effects.pop("xp_boost")
+            if not consumable_effects:
+                data["consumable_effects"].pop(user_id, None)
+        
+        # Apply multiplier
+        final_amount = int(weekly_amount * multiplier)
+        bonus_amount = final_amount - weekly_amount
+        
         # Update balance
-        coins = data.get("coins", {}).get(user_id, 0) + weekly_amount
+        coins = data.get("coins", {}).get(user_id, 0) + final_amount
         data.setdefault("coins", {})[user_id] = coins
         data.setdefault("last_weekly", {})[user_id] = now.isoformat()
         
@@ -254,16 +328,24 @@ class Economy(commands.Cog):
         tx = {
             "time": now.strftime("%Y-%m-%d %H:%M:%S UTC"), 
             "type": "credit", 
-            "amount": weekly_amount, 
-            "reason": "Weekly claim"
+            "amount": final_amount, 
+            "reason": "Weekly claim" + (f" (+{bonus_amount} bonus)" if bonus_amount > 0 else "")
         }
         data.setdefault("transactions", {}).setdefault(user_id, []).append(tx)
         
-        await save_data(data)
+        await save_data(data, force=True)
         
-        embed = discord.Embed(title="Weekly Reward Claimed!", color=0x9d4edd)
-        embed.add_field(name="Amount", value=f"{weekly_amount:,} coins", inline=True)
-        embed.add_field(name="New Balance", value=f"{coins:,} coins", inline=True)
+        embed = discord.Embed(title="🎁 Weekly Reward Claimed!", color=0x9d4edd)
+        embed.add_field(name="Base Amount", value=f"{weekly_amount:,} coins", inline=True)
+        if bonus_amount > 0:
+            embed.add_field(name="Bonus", value=f"+{bonus_amount:,} coins", inline=True)
+            embed.add_field(name="Total Received", value=f"**{final_amount:,} coins**", inline=True)
+            if bonuses:
+                embed.add_field(name="🎁 Active Bonuses", value="\n".join(bonuses), inline=False)
+        else:
+            embed.add_field(name="Total Received", value=f"{final_amount:,} coins", inline=True)
+        embed.add_field(name="New Balance", value=f"💵 {coins:,} coins", inline=False)
+        embed.set_footer(text="💡 Tip: Equip Piggy Bank or use Wealth Potion for bonuses!")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="bank", description="Access your bank account with deposit/withdraw options.")
@@ -426,15 +508,21 @@ class Economy(commands.Cog):
         fine_percent = data.get("config", {}).get("rob_fine_percent", 0.1)
         
         # Check for equipped items that affect robbery
-        equipped = data.get("equipped", {})
+        equipped = data.get("equipment", {})
         robber_equipped = equipped.get(robber_id, {})
         target_equipped = equipped.get(target_id, {})
         
         success_rate = base_success_rate
+        bonuses = []
         
         # Robber bonuses
+        if robber_equipped.get("accessory") == "golden_horseshoe":
+            success_rate += 0.25  # +25% rob success rate
+            bonuses.append("🌟 Golden Horseshoe: +25%")
+        
         if "weapon" in robber_equipped and "lockpick" in robber_equipped["weapon"].lower():
             success_rate += 0.1
+            bonuses.append("🔓 Lockpick: +10%")
         
         # Target protection
         if "armor" in target_equipped and "security" in target_equipped["armor"].lower():
@@ -459,6 +547,8 @@ class Economy(commands.Cog):
             embed.add_field(name="Target", value=user.mention, inline=True)
             embed.add_field(name="Stolen", value=f"{stolen_amount:,} coins", inline=True)
             embed.add_field(name="Success Rate", value=f"{success_rate*100:.1f}%", inline=True)
+            if bonuses:
+                embed.add_field(name="🎁 Active Bonuses", value="\n".join(bonuses), inline=False)
             
             # Add transactions
             now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
