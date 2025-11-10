@@ -103,6 +103,6 @@ async def load_data():
     """Load data using the AGGRESSIVE system"""
     return await data_manager.load_data()
 
-async def save_data(data):
-    """Save data using the AGGRESSIVE system with FORCE"""
+async def save_data(data, force=False):
+    """Save data using the AGGRESSIVE system with optional FORCE parameter"""
     return await data_manager.save_data(data)
