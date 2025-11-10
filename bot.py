@@ -306,13 +306,24 @@ async def interest_task():
 # Admin commands for Firebase management
 @bot.command(name='sync')
 @commands.has_permissions(administrator=True)
-async def sync(ctx):
-    """Sync slash commands with Discord (admin only)"""
+async def sync(ctx, force: str = None):
+    """Sync slash commands with Discord (admin only)
+    
+    Usage:
+    !sync - Normal sync
+    !sync force - Clear and re-sync all commands (fixes cached parameters)
+    """
     try:
-        await ctx.send("🔄 Syncing commands with Discord...")
-        synced = await bot.tree.sync()
-        await ctx.send(f"✅ Successfully synced {len(synced)} slash commands!")
-        print(f"✅ Synced {len(synced)} commands: {[cmd.name for cmd in synced]}")
+        if force == "force":
+            await ctx.send("🔄 Force syncing: Clearing old commands and re-syncing...")
+            bot.tree.clear_commands(guild=None)
+            await bot.tree.sync()
+            await ctx.send("✅ Cleared cache and synced commands! Wait 1-2 minutes and restart Discord.")
+        else:
+            await ctx.send("🔄 Syncing commands with Discord...")
+            synced = await bot.tree.sync()
+            await ctx.send(f"✅ Successfully synced {len(synced)} slash commands!")
+            print(f"✅ Synced {len(synced)} commands: {[cmd.name for cmd in synced]}")
     except Exception as e:
         await ctx.send(f"❌ Failed to sync commands: {e}")
         print(f"❌ Sync error: {e}")
