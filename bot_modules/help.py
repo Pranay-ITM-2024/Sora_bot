@@ -39,12 +39,13 @@ class HelpCog(commands.Cog):
         )
         
         embed.add_field(
-            name="🛒 Interactive Shop", 
-            value="`/shop` - Browse shop with categories:\n"
-                  "• **Consumables** - Temporary effect items\n"
-                  "• **Equipment** - Permanent bonus gear\n"
-                  "• **Loot Chests** - Random reward boxes\n"
-                  "*Guild members get automatic discounts!*", 
+            name="🛒 Shop & Items", 
+            value="`/shop` - Browse with dropdown menus (no typing!)\n"
+                  "• Click category → Select from dropdown → Buy\n"
+                  "`/inventory` - View your items\n"
+                  "`/use <item>` - Use consumables\n"
+                  "`/equip <item>` - Equip gear for bonuses\n"
+                  "`/openchest <chest>` - Open chests for rewards", 
             inline=False
         )
         

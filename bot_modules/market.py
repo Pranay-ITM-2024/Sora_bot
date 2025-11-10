@@ -295,7 +295,7 @@ class BuyStockModal(discord.ui.Modal):
         user_coins = data.get("coins", {}).get(user_id, 0)
         
         if user_coins < total_cost:
-            await interaction.response.send_message(f"❌ Insufficient funds! You need {total_cost:.2f} coins. Your balance: {user_coins:,}", ephemeral=True)
+            await interaction.response.send_message(f"❌ Insufficient funds! You need {total_cost:.2f} coins. Your balance: {user_coins:,} coins", ephemeral=True)
             return
         
         # Process purchase
@@ -308,7 +308,7 @@ class BuyStockModal(discord.ui.Modal):
         # Add transaction
         add_transaction(user_id, total_cost, f"Bought {share_count} {self.symbol} shares", data, "debit")
         
-        await save_data(data)
+        await save_data(data, force=True)
         
         embed = discord.Embed(title="✅ Purchase Successful", color=0x27ae60)
         embed.add_field(name="Stock", value=f"{get_stock_data()[self.symbol]['name']} ({self.symbol})", inline=True)
@@ -316,12 +316,13 @@ class BuyStockModal(discord.ui.Modal):
         embed.add_field(name="Price per Share", value=f"{current_price:.2f} coins", inline=True)
         embed.add_field(name="Trading Fees", value=f"{trading_fee * share_count:.2f} coins", inline=True)
         embed.add_field(name="Total Cost", value=f"{total_cost:.2f} coins", inline=True)
-        embed.add_field(name="New Balance", value=f"{user_coins - total_cost:,} coins", inline=True)
+        embed.add_field(name="New Balance", value=f"{(user_coins - total_cost):,} coins", inline=True)
         
         total_shares = data["stock_portfolios"][user_id][self.symbol]
         embed.add_field(name="Total Shares Owned", value=f"{total_shares:,} {self.symbol}", inline=False)
+        embed.set_footer(text="💡 Use /portfolio to view all your holdings!")
         
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
 class SellStockModal(discord.ui.Modal):
     def __init__(self, symbol):
@@ -352,7 +353,7 @@ class SellStockModal(discord.ui.Modal):
         shares_owned = portfolio.get(self.symbol, 0)
         
         if shares_owned < share_count:
-            await interaction.response.send_message(f"❌ You only own {shares_owned} {self.symbol} shares!", ephemeral=True)
+            await interaction.response.send_message(f"❌ You only own {shares_owned:,} {self.symbol} shares!", ephemeral=True)
             return
         
         current_price = calculate_stock_price(self.symbol, data)
@@ -387,7 +388,7 @@ class SellStockModal(discord.ui.Modal):
         # Add transaction
         add_transaction(user_id, net_proceeds, f"Sold {share_count} {self.symbol} shares", data, "credit")
         
-        await save_data(data)
+        await save_data(data, force=True)
         
         embed = discord.Embed(title="✅ Sale Successful", color=0x27ae60)
         embed.add_field(name="Stock", value=f"{get_stock_data()[self.symbol]['name']} ({self.symbol})", inline=True)
@@ -396,15 +397,17 @@ class SellStockModal(discord.ui.Modal):
         embed.add_field(name="Gross Proceeds", value=f"{gross_proceeds:.2f} coins", inline=True)
         embed.add_field(name="Trading Fees", value=f"{total_fees:.2f} coins", inline=True)
         embed.add_field(name="Net Proceeds", value=f"{net_proceeds:.2f} coins", inline=True)
-        embed.add_field(name="New Balance", value=f"{user_coins + net_proceeds:,} coins", inline=True)
+        embed.add_field(name="New Balance", value=f"{(user_coins + net_proceeds):,} coins", inline=True)
         
         remaining_shares = portfolio.get(self.symbol, 0)
         embed.add_field(name="Remaining Shares", value=f"{remaining_shares:,} {self.symbol}", inline=True)
         
         if bonuses["profit_bonus"] > 0:
             embed.set_footer(text=f"🎉 Equipment bonus applied: +{bonuses['profit_bonus']*100:.1f}% profit!")
+        else:
+            embed.set_footer(text="💡 Use /portfolio to view all your holdings!")
         
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
 class StockSelectView(discord.ui.View):
     """Improved dropdown view for stock selection"""

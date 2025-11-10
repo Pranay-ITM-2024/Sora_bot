@@ -26,10 +26,12 @@ A comprehensive Discord economy bot with casino games, guild system, stock marke
 - **Equipment System** - Equip items for permanent passive effects
 
 ### 🛒 Shop System
-- **Interactive Shop** - Browse items by category with dropdowns
-- **Consumable Items** - Lucky potions, boosters, insurance scrolls
-- **Equipable Items** - Gambler's charms, security dogs, vault keys
-- **Guild Discounts** - Richest guild gets 10% shop discount
+- **Simple Navigation** - 3 categories: Potions, Chests, Equipment
+- **9 Pre-loaded Items** - Ready to buy immediately
+- **Potions** - Temporary boosts for casino, daily rewards, earnings
+- **Chests** - Random coin rewards (100-10,000 coins)
+- **Equipment** - Permanent passive bonuses when equipped
+- **Easy Purchase** - `/buy <item_name>` with clear instructions
 
 ### 🏰 Guild System
 - **Guild Creation** - Create and manage your own guild
