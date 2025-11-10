@@ -469,5 +469,135 @@ class Guild(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
 
+    @app_commands.command(name="guild_invite", description="Invite a user to your guild!")
+    @app_commands.describe(user="The user to invite to your guild")
+    async def guild_invite(self, interaction: discord.Interaction, user: discord.User):
+        if user.bot:
+            await interaction.response.send_message("❌ You can't invite bots to guilds!", ephemeral=True)
+            return
+        
+        if user.id == interaction.user.id:
+            await interaction.response.send_message("❌ You can't invite yourself!", ephemeral=True)
+            return
+        
+        inviter_id = str(interaction.user.id)
+        invitee_id = str(user.id)
+        data = await load_data()
+        
+        # Check if inviter is in a guild
+        inviter_guild = get_user_guild(inviter_id, data)
+        if not inviter_guild:
+            await interaction.response.send_message("❌ You're not in any guild! Create one with `/guild_create`", ephemeral=True)
+            return
+        
+        # Check if invitee is already in a guild
+        invitee_guild = get_user_guild(invitee_id, data)
+        if invitee_guild:
+            await interaction.response.send_message(f"❌ {user.display_name} is already in a guild!", ephemeral=True)
+            return
+        
+        # Check if inviter has permission (owner or officer)
+        guild_info = data.get("guilds", {}).get(inviter_guild, {})
+        inviter_role = get_guild_role(inviter_id, inviter_guild, data)
+        
+        if inviter_role not in ["Owner", "Officer"]:
+            await interaction.response.send_message("❌ Only guild owners and officers can invite members!", ephemeral=True)
+            return
+        
+        # Create invite
+        embed = discord.Embed(
+            title="🏰 Guild Invitation",
+            description=f"**{interaction.user.display_name}** has invited you to join **{inviter_guild}**!",
+            color=0x00ff00
+        )
+        
+        members_count = len(data.get("guild_members", {}).get(inviter_guild, []))
+        guild_bank = guild_info.get("bank", 0)
+        
+        embed.add_field(name="👑 Guild Owner", value=get_guild_owner_name(inviter_guild, data, self.bot), inline=True)
+        embed.add_field(name="👥 Members", value=str(members_count), inline=True)
+        embed.add_field(name="💰 Bank", value=f"{guild_bank:,} coins", inline=True)
+        embed.add_field(
+            name="🎁 Guild Benefits",
+            value="• Shared guild bank\n• +5% bank interest\n• Guild leaderboard ranking\n• Cooperative gameplay",
+            inline=False
+        )
+        embed.set_footer(text="Accept or decline the invitation below")
+        
+        view = GuildInviteView(invitee_id, inviter_guild, inviter_id)
+        await interaction.response.send_message(f"{user.mention}", embed=embed, view=view)
+
+class GuildInviteView(discord.ui.View):
+    """View for accepting/declining guild invites"""
+    def __init__(self, invitee_id, guild_name, inviter_id):
+        super().__init__(timeout=300)
+        self.invitee_id = invitee_id
+        self.guild_name = guild_name
+        self.inviter_id = inviter_id
+    
+    @discord.ui.button(label="Accept", style=discord.ButtonStyle.success, emoji="✅")
+    async def accept_invite(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if str(interaction.user.id) != self.invitee_id:
+            await interaction.response.send_message("❌ This invitation is not for you!", ephemeral=True)
+            return
+        
+        data = await load_data()
+        
+        # Check if user is already in a guild
+        if get_user_guild(self.invitee_id, data):
+            await interaction.response.send_message("❌ You're already in a guild!", ephemeral=True)
+            return
+        
+        # Add user to guild
+        data.setdefault("guild_members", {}).setdefault(self.guild_name, []).append(self.invitee_id)
+        await save_data(data, force=True)
+        
+        embed = discord.Embed(
+            title="✅ Guild Joined!",
+            description=f"You've successfully joined **{self.guild_name}**!",
+            color=0x00ff00
+        )
+        embed.add_field(
+            name="🎉 Welcome!",
+            value="You can now:\n• Deposit to `/guild_bank`\n• View `/guild_members`\n• Check `/guild_info`\n• Earn +5% bank interest",
+            inline=False
+        )
+        
+        # Disable buttons
+        for item in self.children:
+            item.disabled = True
+        
+        await interaction.response.edit_message(embed=embed, view=self)
+    
+    @discord.ui.button(label="Decline", style=discord.ButtonStyle.danger, emoji="❌")
+    async def decline_invite(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if str(interaction.user.id) != self.invitee_id:
+            await interaction.response.send_message("❌ This invitation is not for you!", ephemeral=True)
+            return
+        
+        embed = discord.Embed(
+            title="❌ Invitation Declined",
+            description=f"You declined the invitation to **{self.guild_name}**.",
+            color=0xff0000
+        )
+        
+        # Disable buttons
+        for item in self.children:
+            item.disabled = True
+        
+        await interaction.response.edit_message(embed=embed, view=self)
+
+def get_guild_owner_name(guild_name, data, bot):
+    """Get guild owner's display name"""
+    guild_info = data.get("guilds", {}).get(guild_name, {})
+    owner_id = guild_info.get("owner")
+    if owner_id:
+        try:
+            # This will need to be async in actual use
+            return f"<@{owner_id}>"
+        except:
+            return "Unknown"
+    return "Unknown"
+
 async def setup(bot):
     await bot.add_cog(Guild(bot))

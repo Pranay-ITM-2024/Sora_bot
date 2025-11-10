@@ -304,6 +304,19 @@ async def interest_task():
         logging.error(f"Interest calculation failed: {e}")
 
 # Admin commands for Firebase management
+@bot.command(name='sync')
+@commands.has_permissions(administrator=True)
+async def sync(ctx):
+    """Sync slash commands with Discord (admin only)"""
+    try:
+        await ctx.send("🔄 Syncing commands with Discord...")
+        synced = await bot.tree.sync()
+        await ctx.send(f"✅ Successfully synced {len(synced)} slash commands!")
+        print(f"✅ Synced {len(synced)} commands: {[cmd.name for cmd in synced]}")
+    except Exception as e:
+        await ctx.send(f"❌ Failed to sync commands: {e}")
+        print(f"❌ Sync error: {e}")
+
 @bot.command(name='firebase_status')
 @commands.has_permissions(administrator=True)
 async def firebase_status(ctx):
