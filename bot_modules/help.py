@@ -43,10 +43,11 @@ class HelpCog(commands.Cog):
         
         embed.add_field(
             name="🛒 Shop & Items", 
-            value="`/shop` - Browse with dropdown menus (no typing!)\n"
-                  "• Click category → Select from dropdown → Buy\n"
+            value="`/shop` - Interactive shop with dropdown menus\n"
+                  "• Select category → Choose item → Buy!\n"
+                  "• No typing required, fully automated\n"
                   "`/inventory` - View your items\n"
-                  "`/use <item>` - Use consumables\n"
+                  "`/use <item>` - Use consumables for effects\n"
                   "`/equip <item>` - Equip gear for bonuses\n"
                   "`/openchest <chest>` - Open chests for rewards", 
             inline=False
@@ -55,22 +56,25 @@ class HelpCog(commands.Cog):
         embed.add_field(
             name="🎒 Inventory & Equipment", 
             value="`/inventory` - View all owned items\n"
-                  "`/equip` - Equip gear for bonuses\n"
+                  "`/equip` - Equip gear for permanent bonuses\n"
                   "`/unequip` - Remove equipped items\n"
-                  "`/use` - Consume items for effects\n"
+                  "`/use` - Consume potions for temporary effects\n"
                   "`/openchest` - Open loot chests\n"
+                  "**Item Effects:** Boost daily/weekly, casino luck, rob success\n"
                   "**Equipment Slots:** Accessory, Tool, Armor, Pet", 
             inline=False
         )
         
         embed.add_field(
             name="🏰 Guild System", 
-            value="`/guild` - Complete guild management:\n"
-                  "• Create/join/leave guilds\n"
-                  "• Shared guild bank system\n"
-                  "• Member roles & permissions\n"
-                  "• Guild bonuses: shop discounts, bank interest\n"
-                  "• Invite system with codes", 
+            value="`/guild_create` - Create your own guild\n"
+                  "`/guild_join` - Join guild via dropdown menu\n"
+                  "`/guild_leave` - Leave current guild\n"
+                  "`/guild_invite` - Invite users (owner/officer)\n"
+                  "`/guild_bank` - Deposit/withdraw from guild bank\n"
+                  "`/guild_info` - View guild details\n"
+                  "`/guild_members` - List all members\n"
+                  "**Bonuses:** Shop discounts, bank interest", 
             inline=False
         )
         
@@ -110,11 +114,11 @@ class HelpCog(commands.Cog):
         
         embed.add_field(
             name="💡 Pro Tips", 
-            value="• Equip items for permanent bonuses\n"
-                  "• Join a guild for shop discounts\n"
-                  "• Use consumables before gambling\n"
-                  "• Diversify your stock portfolio\n"
-                  "• Check leaderboards for goals", 
+            value="• Equip lucky_charm/piggy_bank for bonuses\n"
+                  "• Use luck_potion before gambling\n"
+                  "• Join guilds via dropdown menu\n"
+                  "• Wealth_potion doubles daily/weekly\n"
+                  "• Golden_horseshoe boosts rob success", 
             inline=True
         )
         
