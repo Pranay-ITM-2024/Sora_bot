@@ -10,6 +10,7 @@ import asyncio
 import random
 from datetime import datetime, timedelta
 from .database import load_data, save_data
+from .economy import deduct_combined_balance
 
 def get_stock_data():
     """Get stock market data with realistic companies and sectors"""
@@ -291,15 +292,16 @@ class BuyStockModal(discord.ui.Modal):
         if bonuses["fee_reduction"] > 0:
             trading_fee = int(trading_fee * (1 - bonuses["fee_reduction"]))
         
-        total_cost = (current_price * share_count) + (trading_fee * share_count)
-        user_coins = data.get("coins", {}).get(user_id, 0)
+        total_cost = int((current_price * share_count) + (trading_fee * share_count))
         
-        if user_coins < total_cost:
-            await interaction.response.send_message(f"❌ Insufficient funds! You need {total_cost:.2f} coins. Your balance: {user_coins:,} coins", ephemeral=True)
+        # Try to deduct from wallet + bank combined
+        success, message, from_wallet, from_bank = deduct_combined_balance(user_id, total_cost, data)
+        
+        if not success:
+            await interaction.response.send_message(message, ephemeral=True)
             return
         
         # Process purchase
-        data.setdefault("coins", {})[user_id] = user_coins - total_cost
         data.setdefault("stock_portfolios", {}).setdefault(user_id, {})[self.symbol] = data["stock_portfolios"][user_id].get(self.symbol, 0) + share_count
         
         # Update stock prices (simulate market impact)
@@ -310,13 +312,21 @@ class BuyStockModal(discord.ui.Modal):
         
         await save_data(data, force=True)
         
-        embed = discord.Embed(title="✅ Purchase Successful", color=0x27ae60)
+        # Get new balances
+        new_wallet = data.get("coins", {}).get(user_id, 0)
+        new_bank = data.get("bank", {}).get(user_id, 0)
+        
+        embed = discord.Embed(
+            title="✅ Purchase Successful",
+            description=message,
+            color=0x27ae60
+        )
         embed.add_field(name="Stock", value=f"{get_stock_data()[self.symbol]['name']} ({self.symbol})", inline=True)
         embed.add_field(name="Shares Bought", value=f"{share_count:,}", inline=True)
         embed.add_field(name="Price per Share", value=f"{current_price:.2f} coins", inline=True)
         embed.add_field(name="Trading Fees", value=f"{trading_fee * share_count:.2f} coins", inline=True)
         embed.add_field(name="Total Cost", value=f"{total_cost:.2f} coins", inline=True)
-        embed.add_field(name="New Balance", value=f"{(user_coins - total_cost):,} coins", inline=True)
+        embed.add_field(name="New Balance", value=f"💰 {new_wallet:,} | 🏦 {new_bank:,}", inline=True)
         
         total_shares = data["stock_portfolios"][user_id][self.symbol]
         embed.add_field(name="Total Shares Owned", value=f"{total_shares:,} {self.symbol}", inline=False)

@@ -29,6 +29,83 @@ def deduct_debt(user_id, amount, data):
     
     return remaining, debt_paid
 
+def auto_deduct_debt_from_balance(user_id, data):
+    """
+    Automatically deduct debt from user's wallet and bank balance.
+    Called whenever checking balance or loading user data.
+    Returns (debt_paid, message) tuple.
+    """
+    user_id = str(user_id)
+    debt = data.get("debt", {}).get(user_id, 0)
+    
+    if debt <= 0:
+        return 0, None
+    
+    wallet = data.get("coins", {}).get(user_id, 0)
+    bank = data.get("bank", {}).get(user_id, 0)
+    total_money = wallet + bank
+    
+    if total_money <= 0:
+        return 0, None
+    
+    # Calculate how much debt we can pay
+    debt_to_pay = min(debt, total_money)
+    
+    # Deduct from wallet first, then bank
+    if wallet >= debt_to_pay:
+        data.setdefault("coins", {})[user_id] = wallet - debt_to_pay
+        remaining_wallet = wallet - debt_to_pay
+        remaining_bank = bank
+    else:
+        # Take all from wallet, rest from bank
+        remaining_from_bank = debt_to_pay - wallet
+        data.setdefault("coins", {})[user_id] = 0
+        data.setdefault("bank", {})[user_id] = bank - remaining_from_bank
+        remaining_wallet = 0
+        remaining_bank = bank - remaining_from_bank
+    
+    # Update debt
+    new_debt = debt - debt_to_pay
+    if new_debt > 0:
+        data.setdefault("debt", {})[user_id] = new_debt
+    else:
+        data.setdefault("debt", {})[user_id] = 0
+    
+    # Create message
+    message = (
+        f"💳 **Debt Payment Auto-Deducted**\n"
+        f"• Paid: {debt_to_pay:,} coins\n"
+        f"• Remaining debt: {new_debt:,} coins\n"
+        f"• New wallet: {remaining_wallet:,} coins\n"
+        f"• New bank: {remaining_bank:,} coins"
+    )
+    
+    return debt_to_pay, message
+
+def deduct_combined_balance(user_id, amount, data):
+    """
+    Deduct from wallet first, then bank if wallet is insufficient.
+    Returns (success: bool, message: str, from_wallet: int, from_bank: int)
+    """
+    user_id = str(user_id)
+    wallet = data.get("coins", {}).get(user_id, 0)
+    bank = data.get("bank", {}).get(user_id, 0)
+    total = wallet + bank
+    
+    if total < amount:
+        return False, f"❌ Insufficient funds! Need {amount:,} but have {total:,} total (💰 {wallet:,} + 🏦 {bank:,})", 0, 0
+    
+    # Deduct from wallet first
+    if wallet >= amount:
+        data.setdefault("coins", {})[user_id] = wallet - amount
+        return True, f"💰 Paid {amount:,} from wallet", amount, 0
+    else:
+        # Take all from wallet, rest from bank
+        remaining_needed = amount - wallet
+        data.setdefault("coins", {})[user_id] = 0
+        data.setdefault("bank", {})[user_id] = bank - remaining_needed
+        return True, f"💰 Paid {wallet:,} from wallet + 🏦 {remaining_needed:,} from bank", wallet, remaining_needed
+
 def get_rarity_color(rarity):
     """Get color for item rarity"""
     colors = {
@@ -190,18 +267,31 @@ class Economy(commands.Cog):
     async def balance(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
         data = await load_data()
+        
+        # Auto-deduct debt from balance if they have money
+        debt_paid, debt_message = auto_deduct_debt_from_balance(user_id, data)
+        
+        if debt_paid > 0:
+            await save_data(data)
+        
         coins = data.get("coins", {}).get(user_id, 0)
         bank = data.get("bank", {}).get(user_id, 0)
         debt = data.get("debt", {}).get(user_id, 0)
         
         embed = discord.Embed(title=f"{interaction.user.display_name}'s Balance", color=0x00ff99)
+        
+        # Show debt payment notification if debt was paid
+        if debt_paid > 0:
+            embed.description = debt_message
+            embed.color = 0xFFD700  # Gold color for debt payment
+        
         embed.add_field(name="💰 Wallet", value=f"{coins:,} coins", inline=True)
         embed.add_field(name="🏦 Bank", value=f"{bank:,} coins", inline=True)
         embed.add_field(name="💎 Total", value=f"{coins + bank:,} coins", inline=True)
         
         if debt > 0:
             embed.add_field(name="💳 Outstanding Debt", value=f"{debt:,} coins", inline=False)
-            embed.set_footer(text="⚠️ Debt will be automatically deducted from your future earnings!")
+            embed.set_footer(text="⚠️ Debt will be automatically deducted from your wallet and bank!")
         
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -478,6 +568,12 @@ class Economy(commands.Cog):
         user_id = str(interaction.user.id)
         data = await load_data()
         
+        # Auto-deduct debt from balance if they have money
+        debt_paid, debt_message = auto_deduct_debt_from_balance(user_id, data)
+        
+        if debt_paid > 0:
+            await save_data(data)
+        
         coins = data.get("coins", {}).get(user_id, 0)
         bank = data.get("bank", {}).get(user_id, 0)
         total_wealth = coins + bank
@@ -494,6 +590,10 @@ class Economy(commands.Cog):
         
         embed = discord.Embed(title=f"👤 {interaction.user.display_name}'s Profile", color=0x9b59b6)
         embed.set_thumbnail(url=interaction.user.display_avatar.url)
+        
+        # Show debt payment notification if debt was paid
+        if debt_paid > 0:
+            embed.description = f"✅ {debt_message}"
         
         embed.add_field(name="💰 Wealth", value=f"{total_wealth:,} coins", inline=True)
         embed.add_field(name="🏦 Bank", value=f"{bank:,} coins", inline=True)

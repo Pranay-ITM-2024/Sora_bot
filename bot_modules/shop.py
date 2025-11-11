@@ -6,6 +6,7 @@ from discord import app_commands
 from discord.ext import commands
 import random
 from .database import load_data, save_data
+from .economy import deduct_combined_balance
 
 # 🛒 SHOP CATALOG - Pre-defined items with clear descriptions!
 SHOP_ITEMS = {
@@ -132,28 +133,29 @@ class PurchaseView(discord.ui.View):
             return
         
         data = await load_data()
-        user_coins = data.get("coins", {}).get(self.user_id, 0)
+        price = self.item_data['price']
         
-        # Check if user can afford it
-        if user_coins < self.item_data['price']:
-            needed = self.item_data['price'] - user_coins
-            await interaction.response.send_message(
-                f"❌ You need **{needed:,} more coins** to buy this item!",
-                ephemeral=True
-            )
+        # Try to deduct from wallet + bank combined
+        success, message, from_wallet, from_bank = deduct_combined_balance(self.user_id, price, data)
+        
+        if not success:
+            await interaction.response.send_message(message, ephemeral=True)
             return
         
-        # Purchase the item
-        data.setdefault("coins", {})[self.user_id] = user_coins - self.item_data['price']
+        # Purchase the item - add to inventory
         data.setdefault("inventories", {}).setdefault(self.user_id, {})[self.item_key] = \
             data["inventories"][self.user_id].get(self.item_key, 0) + 1
         
         await save_data(data)
         
+        # Get new balances
+        new_wallet = data.get("coins", {}).get(self.user_id, 0)
+        new_bank = data.get("bank", {}).get(self.user_id, 0)
+        
         # Success message
         embed = discord.Embed(
             title="✅ Purchase Successful!",
-            description=f"You bought **{self.item_data['name']}**!",
+            description=f"You bought **{self.item_data['name']}**!\n\n{message}",
             color=0x00ff00
         )
         
@@ -171,7 +173,7 @@ class PurchaseView(discord.ui.View):
         
         embed.add_field(
             name="💼 New Balance",
-            value=f"{user_coins - self.item_data['price']:,} coins",
+            value=f"💰 {new_wallet:,} | 🏦 {new_bank:,}",
             inline=True
         )
         

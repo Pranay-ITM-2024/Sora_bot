@@ -1,0 +1,730 @@
+================================================================================
+                    🏦 HEIST SYSTEM - PLAYER GUIDE
+================================================================================
+
+Your complete guide to planning and executing the perfect guild bank robbery!
+
+================================================================================
+                        📖 TABLE OF CONTENTS
+================================================================================
+
+1. What is a Heist?
+2. When Can You Heist?
+3. Who Can Start Heists?
+4. Heist Modes
+5. Solo Heist Guide
+6. Multiplayer Heist Guide
+7. Heist Gear & Equipment
+8. Rewards & Penalties
+9. Saturday Guild Contributions
+10. Pro Tips & Strategies
+
+================================================================================
+                        🎯 WHAT IS A HEIST?
+================================================================================
+
+A HEIST is a high-stakes guild-vs-guild bank robbery where you attempt to 
+steal coins from another guild's bank! It's an interactive, skill-based 
+minigame system that requires quick thinking, coordination, and the right 
+equipment.
+
+KEY FEATURES:
+• Interactive Minigames - Each phase has unique challenges
+• Multiplayer or Solo - Go alone or bring a team (2-5 players)
+• High Rewards - Successfully steal up to 75% of a guild's bank
+• Real Consequences - Failure means penalties paid to the target guild
+• Gear System - Buy equipment to improve your odds
+
+================================================================================
+                      ⏰ WHEN CAN YOU HEIST?
+================================================================================
+
+SUNDAYS ONLY!
+Heists can ONLY be performed on Sundays (UTC timezone).
+
+WHY SUNDAYS?
+• On Saturday midnight, all guild members automatically contribute 75% of 
+  their total wealth to the guild bank
+• This creates high-value targets with lots of coins
+• Sunday is "heist day" when guilds can raid each other
+
+COOLDOWN:
+• Each guild can only do ONE heist per Sunday
+• After your guild completes a heist (success or fail), you must wait until 
+  next Sunday
+• The cooldown is per guild, not per player
+
+================================================================================
+                    👑 WHO CAN START HEISTS?
+================================================================================
+
+GUILD LEADERS ONLY!
+Only your guild owner/leader can initiate heists using the /heist command.
+
+WHY?
+• Prevents spam and trolling
+• Ensures strategic decision-making
+• Leader chooses targets and team composition
+• Protects guild resources
+
+WHAT IF I'M NOT THE LEADER?
+• You can still participate if your leader selects you for a multiplayer heist
+• Ask your guild leader to organize heist events
+• Work on improving your skills and buying heist gear
+
+================================================================================
+                        🎮 HEIST MODES
+================================================================================
+
+There are TWO ways to execute a heist:
+
+┌─────────────┬─────────┬────────────┬─────────┬──────────────────┐
+│ Mode        │ Players │ Difficulty │ Rewards │ Best For         │
+├─────────────┼─────────┼────────────┼─────────┼──────────────────┤
+│ Solo        │ 1       │ Easier     │ Lower   │ Quick runs, solo │
+│ Multiplayer │ 2-5     │ Harder     │ Higher  │ Big scores, team │
+└─────────────┴─────────┴────────────┴─────────┴──────────────────┘
+
+SOLO HEIST:
+✅ You control everything
+✅ Simpler coordination
+✅ All rewards to you
+❌ No team bonuses
+❌ Smaller steals recommended
+
+MULTIPLAYER HEIST:
+✅ Team bonuses stack (60% effectiveness)
+✅ Role specialization
+✅ Can attempt bigger heists
+❌ One person fails = everyone fails
+❌ Requires coordination
+
+================================================================================
+                      🥷 SOLO HEIST GUIDE
+================================================================================
+
+STARTING A SOLO HEIST:
+
+1. Use the command (Guild leader only):
+   /heist target_guild:EnemyGuild amount:10000
+   
+   • target_guild = Guild you want to rob
+   • amount = How much to steal (0 = auto 50%, max 75% of their bank)
+
+2. Review the preview:
+   • See target bank balance
+   • Check difficulty level (🟢 Easy / 🟡 Medium / 🔴 Hard)
+   • View your gear bonuses
+   • Understand penalties if you fail
+
+3. Click "Solo Heist" button
+
+--------------------------------------------------------------------------------
+
+THE THREE PHASES:
+
+Every heist has 3 phases you must complete:
+
+Phase 1: 🚪 ENTRY - Break into the building and bypass initial security
+Phase 2: 🔓 VAULT BREACH - Open the vault and access the money
+Phase 3: 🏃 ESCAPE - Get away clean without getting caught!
+
+--------------------------------------------------------------------------------
+
+THREE APPROACH STYLES:
+
+Each phase, you choose HOW to proceed:
+
+┌──────────┬─────────────────────┬──────────────────────────┐
+│ Approach │ Best For            │ Risk Level               │
+├──────────┼─────────────────────┼──────────────────────────┤
+│ Stealth  │ Avoiding detection  │ Low noise, steady pace   │
+│ Fast     │ Quick completion    │ High noise, fast finish  │
+│ Tech     │ Balanced approach   │ Medium noise, good pace  │
+└──────────┴─────────────────────┴──────────────────────────┘
+
+IMPORTANT: Each approach has a unique minigame you must complete!
+
+--------------------------------------------------------------------------------
+
+THE NOISE METER:
+
+• Every action generates NOISE 🔊
+• Higher noise = higher detection chance
+• If you get detected = INSTANT FAIL! 🚨
+• Noise carries over between phases
+• Stealth gear reduces noise generation
+
+STRATEGY TIP: Mix approaches based on your gear and current noise level!
+
+--------------------------------------------------------------------------------
+
+SOLO MINIGAMES:
+
+Depending on your approach, you'll face:
+
+• Pattern Recognition - Memorize and repeat emoji sequences
+• Reaction Speed - Press the correct button FAST (5 seconds!)
+• Code Cracking - Solve math problems
+• Lockpicking - Guess combinations using hints
+
+Each minigame must be completed successfully to progress!
+
+--------------------------------------------------------------------------------
+
+WINNING SOLO:
+
+✅ Complete all 3 phases without detection
+✅ Reach 100% progress each phase
+✅ Pass all minigames
+
+REWARDS:
+• Full stolen amount goes to your guild bank
+• You personally receive 10% of the stolen amount in your wallet
+• Bragging rights!
+
+================================================================================
+                    👥 MULTIPLAYER HEIST GUIDE
+================================================================================
+
+STEP 1: LEADER SELECTS TEAM MEMBERS
+
+1. Guild leader clicks "Multiplayer Heist"
+2. A dropdown menu appears showing all guild members
+3. Leader selects 1-4 additional members (2-5 total including leader)
+4. Selected members are automatically included (no opt-out)
+5. Click "Confirm Team & Proceed"
+
+TEAM SIZE MATTERS:
+• 2 players: Easier coordination, fewer bonuses
+• 3-4 players: Balanced approach
+• 5 players: Maximum bonuses, highest coordination challenge
+
+--------------------------------------------------------------------------------
+
+STEP 2: ROLE ASSIGNMENT
+
+The leader assigns one role to each team member:
+
+👔 LEADER
+   Task Type: Coordination and decision-making
+   Specialty: Team management
+   Minigame: Mental Math (calculations)
+   Best For: The guild leader (reliable player)
+
+💻 HACKER
+   Task Type: Disable security systems and alarms
+   Specialty: Technology and electronics
+   Minigame: Code Cracking (math problems)
+   Best For: Players good with numbers
+
+💪 MUSCLE
+   Task Type: Breaking vaults and forcing entry
+   Specialty: Physical tasks
+   Minigame: Lockpicking (combination guessing)
+   Best For: Patient players who can solve puzzles
+
+🚗 DRIVER
+   Task Type: Plan escape routes and getaway
+   Specialty: Quick reactions
+   Minigame: Reaction Speed (button pressing)
+   Best For: Players with fast reflexes
+
+👁️ SCOUT
+   Task Type: Monitor threats and guards
+   Specialty: Observation and stealth
+   Minigame: Pattern Recognition (memory)
+   Best For: Detail-oriented players
+
+IMPORTANT: Each role can only be assigned ONCE per heist!
+
+--------------------------------------------------------------------------------
+
+STEP 3: EXECUTE THE HEIST
+
+Once roles are assigned and confirmed:
+
+1. All team members see the heist interface
+2. Each player has a "Complete Task" button
+3. Tasks are role-specific for each phase
+
+Example Phase Tasks:
+• Leader: "Coordinate team movements"
+• Hacker: "Bypass security cameras"
+• Muscle: "Break through vault door"
+• Driver: "Plan escape route"
+• Scout: "Monitor guard patrols"
+
+--------------------------------------------------------------------------------
+
+TEAM PROGRESS SYSTEM:
+
+• Each player has individual progress (0-100%)
+• All players see everyone's progress in real-time
+• Phase completes when ALL members reach 100%
+• Progress resets to 0% for the next phase
+
+Visual Example:
+   Phase 1: 🚪 Entry
+   
+   👔 @Leader (Leader): Coordinate movements ✅ 100%
+   💻 @Hacker (Hacker): Bypass cameras 🔄 85%
+   💪 @Muscle (Muscle): Force door ✅ 100%
+   👁️ @Scout (Scout): Watch guards 🔄 60%
+
+--------------------------------------------------------------------------------
+
+⚠️ CRITICAL RULE: ONE FAILS, ALL FAIL!
+
+If ANY team member fails their minigame, the ENTIRE heist fails immediately!
+
+This means:
+• Everyone loses
+• Everyone pays penalties
+• High-stakes teamwork is essential
+• Choose reliable team members
+• Communication is key (outside the bot)
+
+--------------------------------------------------------------------------------
+
+TEAM BONUSES:
+
+When multiple players have heist gear equipped, bonuses stack at 60% 
+effectiveness:
+
+Example:
+• Player 1 has +20% stealth gear
+• Player 2 has +15% stealth gear
+• Team stealth bonus = (20% × 0.6) + (15% × 0.6) = 21% total
+
+Why 60%? Prevents overpowered combinations while still rewarding teamwork.
+
+--------------------------------------------------------------------------------
+
+MULTIPLAYER MINIGAMES:
+
+Each role has its own unique minigame:
+
+👔 Leader: Mental Math - Solve calculations quickly
+💻 Hacker: Code Cracking - Add numbers correctly
+💪 Muscle: Lockpicking - Guess 3-digit combinations
+🚗 Driver: Reaction Speed - Press correct button in 5 seconds!
+👁️ Scout: Pattern Recognition - Memorize emoji patterns
+
+All minigames must be completed successfully by each member in each phase!
+
+--------------------------------------------------------------------------------
+
+WINNING MULTIPLAYER:
+
+✅ All team members complete 3 phases
+✅ Everyone passes all their minigames
+✅ Team reaches 100% progress each phase
+
+REWARDS:
+• Full stolen amount goes to your guild bank
+• Each team member receives: (stolen amount × 10%) ÷ team size
+  Example: 10,000 stolen, 5 players = 10,000 × 0.1 ÷ 5 = 200 coins each
+• Shared glory!
+
+================================================================================
+                    🛠️ HEIST GEAR & EQUIPMENT
+================================================================================
+
+Heist gear DRAMATICALLY improves your success chances! Available in the shop 
+under Heist Gear category.
+
+AVAILABLE GEAR:
+
+┌─────────────────────────┬───────┬──────────────────────────┬─────────────┐
+│ Item                    │ Price │ Effect                   │ Best For    │
+├─────────────────────────┼───────┼──────────────────────────┼─────────────┤
+│ Pro Lockpick            │ 3,500 │ +15% stealth, +10% speed │ Entry       │
+│ Night Vision Goggles    │ 4,000 │ +20% stealth, -15% det.  │ Stealth     │
+│ Smoke Bomb              │ 1,500 │ +25% escape, +10% stealth│ Escape      │
+│ Master Disguise         │ 5,000 │ +30% stealth, -20% det.  │ Blending in │
+│ Getaway Car             │ 7,500 │ +30% escape, +15% speed  │ Phase 3     │
+│ Hacking Device          │ 6,000 │ +25% security, +10% speed│ Tech apps   │
+│ Thermal Drill           │ 4,500 │ +20% speed, +10% noise   │ Fast heists │
+└─────────────────────────┴───────┴──────────────────────────┴─────────────┘
+
+--------------------------------------------------------------------------------
+
+HOW TO USE GEAR:
+
+1. Buy from shop: /shop → Heist Gear category
+2. Equip items: /equip command (permanent gear)
+3. Or keep in inventory: Some items provide bonuses even unequipped
+4. Check bonuses: When starting heist, preview shows your total bonuses
+
+--------------------------------------------------------------------------------
+
+GEAR TYPES:
+
+EQUIPMENT (Permanent):
+• Equip in your loadout slots
+• Bonuses apply to all heists
+• Can be unequipped and re-equipped
+• Examples: Lockpick, Goggles, Disguise, Car, Hacking Device, Drill
+
+CONSUMABLES (One-Time Use):
+• Used during heist and consumed
+• Powerful temporary effects
+• Must rebuy after use
+• Example: Smoke Bomb
+
+--------------------------------------------------------------------------------
+
+BONUS TYPES EXPLAINED:
+
+• Stealth: Reduces noise generated (avoid detection)
+• Speed: Increases progress per action (complete faster)
+• Escape: Helps with phase 3 getaway
+• Detection: Reduces chance of getting caught
+• Security: Helps with tech approaches and alarms
+
+--------------------------------------------------------------------------------
+
+BUILDING YOUR LOADOUT:
+
+BEGINNER LOADOUT ($9,000 total):
+• Pro Lockpick (3,500)
+• Night Vision Goggles (4,000)
+• Smoke Bomb (1,500)
+
+ADVANCED LOADOUT ($19,000 total):
+• Master Disguise (5,000)
+• Getaway Car (7,500)
+• Hacking Device (6,000)
+
+PRO TIP: In multiplayer, have EVERY team member buy gear for maximum 
+stacking bonuses!
+
+================================================================================
+                      💰 REWARDS & PENALTIES
+================================================================================
+
+SUCCESS REWARDS:
+
+GUILD BANK:
+• Full stolen amount transferred to YOUR guild bank
+• Can steal up to 75% of target's bank
+• Higher amounts = higher risk
+
+PERSONAL REWARDS:
+• Solo: You receive 10% of stolen amount personally
+• Multiplayer: 10% split equally among team
+  Formula: (Stolen × 0.1) ÷ Team Size
+
+Example Success:
+   Target: EnemyGuild (Bank: 100,000)
+   Amount: 50,000 (50%)
+   Team: 4 players
+   
+   Results:
+   ✅ EnemyGuild bank: -50,000 (now 50,000)
+   ✅ Your guild bank: +50,000
+   ✅ Each team member: +1,250 coins (50,000 × 0.1 ÷ 4)
+
+--------------------------------------------------------------------------------
+
+FAILURE PENALTIES:
+
+If your heist fails (detection or failed minigame):
+
+PENALTY AMOUNT:
+• You pay 30% of the amount you TRIED to steal
+• Example: Tried to steal 20,000 → Pay 6,000 penalty
+
+WHO PAYS:
+• Solo: Full penalty from your wallet/bank
+• Multiplayer: Penalty split equally among team
+
+WHERE DOES IT GO:
+• All penalties paid to the TARGET guild's bank
+• They profit from your failed attempt!
+• Serves as compensation and deterrent
+
+Example Failure:
+   Target: EnemyGuild
+   Attempted: 20,000
+   Team: 3 players
+   
+   Results:
+   ❌ Heist failed!
+   ❌ Total penalty: 6,000 (20,000 × 0.3)
+   ❌ Each player pays: 2,000 (6,000 ÷ 3)
+   ✅ EnemyGuild bank: +6,000
+
+--------------------------------------------------------------------------------
+
+DEBT SYSTEM:
+
+If you can't afford the penalty, the remainder becomes DEBT:
+
+• Debt tracked in your profile
+• Auto-deducted from future earnings:
+  - Daily rewards
+  - Weekly rewards
+  - Casino winnings
+  - Any income source
+• Shows in /balance command
+• Must be paid off before keeping earnings
+
+Example Debt:
+   You owe: 5,000 penalty
+   You have: 3,000 coins total
+   Result: 2,000 debt created
+   
+   Next daily reward (500):
+   - 500 goes to debt
+   - Remaining debt: 1,500
+
+================================================================================
+                📅 SATURDAY GUILD CONTRIBUTIONS
+================================================================================
+
+An automatic system that prepares guilds for Sunday heists!
+
+HOW IT WORKS:
+
+Every Saturday at midnight UTC:
+1. Bot calculates 75% of your total wealth (coins + bank balance)
+2. Automatically deposits that amount to your guild bank
+3. Locks withdrawals from guild bank until:
+   • Sunday night ends, OR
+   • Your guild is targeted by a heist
+
+Example:
+   You have: 10,000 coins + 40,000 bank = 50,000 total
+   Saturday contribution: 37,500 (75%)
+   Your remaining: 12,500
+   Guild bank receives: 37,500
+
+--------------------------------------------------------------------------------
+
+WHY THIS EXISTS:
+
+• Forces guilds to pool resources for defense/attacks
+• Creates high-value heist targets
+• Prevents players from hiding wealth before Sunday
+• Makes heist day more exciting and strategic
+• Fair system for all guilds
+
+--------------------------------------------------------------------------------
+
+WHAT HAPPENS IF TARGETED:
+
+If another guild uses /heist against your guild:
+• Withdrawal lock is removed immediately
+• Guild can access funds even during Saturday/Sunday
+• Compensation for being targeted
+• Allows defensive spending
+
+--------------------------------------------------------------------------------
+
+STRATEGIC TIPS:
+
+• Save coins during the week for Saturday contributions
+• Coordinate with guild for big Saturday deposits
+• Your guild's total bank = heist target attractiveness
+• Balance defense (low bank) vs offense (high bank for your heists)
+
+================================================================================
+                    💡 PRO TIPS & STRATEGIES
+================================================================================
+
+GENERAL TIPS:
+
+1. Start Small: Practice with smaller steal amounts (10-30%) before 
+   attempting big heists
+
+2. Buy Gear First: Always invest in heist gear before attempting heists
+
+3. Check Target Bank: Use /guild_info to scope out rich targets
+
+4. Sunday Planning: Be ready at the start of Sunday to get first heist 
+   attempt
+
+5. One Shot: Remember, only one heist per guild per Sunday - make it count!
+
+--------------------------------------------------------------------------------
+
+SOLO HEIST STRATEGIES:
+
+APPROACH SELECTION:
+• Early phases: Use Stealth to keep noise low
+• Mid-phase: Can risk Fast if you have good gear
+• Final phase: Stealth again for safe escape
+• Tech: Good all-around if you have hacking gear
+
+MINIGAME PREP:
+• Pattern Recognition: Have pen/paper ready or screenshot
+• Reaction Speed: Clear distractions, be ready to click fast
+• Math Games: Use calculator if needed (no shame!)
+
+NOISE MANAGEMENT:
+• Track your noise level carefully
+• If above 60-70%, switch to Stealth only
+• Detection chance increases exponentially with noise
+• Stealth gear is your best friend
+
+--------------------------------------------------------------------------------
+
+MULTIPLAYER STRATEGIES:
+
+TEAM SELECTION:
+• Choose reliable, active players
+• Ensure everyone has heist gear
+• Communicate plan before starting (Discord/DMs)
+• Assign roles based on player strengths:
+  - Good at math → Hacker/Leader
+  - Fast reactions → Driver
+  - Patient → Muscle/Scout
+
+ROLE OPTIMIZATION:
+• Easiest roles: Hacker (simple math), Scout (pattern matching)
+• Hardest role: Driver (5-second time limit!)
+• Consider giving hardest roles to most experienced players
+
+TEAM COORDINATION:
+• All members should be online and ready
+• Have backup communication (Discord voice chat)
+• Agree on minigame strategies beforehand
+• Support struggling members with tips
+
+GEAR DISTRIBUTION:
+• Ideally, EVERY member has heist gear
+• Focus on stealth and speed bonuses
+• Smoke bombs for Driver role
+• Coordinate purchases if guild bank allows
+
+--------------------------------------------------------------------------------
+
+TARGET SELECTION:
+
+GOOD TARGETS:
+✅ Guilds with 20,000+ in bank (post-Saturday)
+✅ Guilds with few active members (weak defense)
+✅ Guilds you've scouted beforehand
+
+AVOID:
+❌ Your own guild (not allowed)
+❌ Guilds with under 10,000 (not worth penalty risk)
+❌ Friendly guilds (politics matter!)
+
+OPTIMAL STEAL AMOUNTS:
+• Beginners: 25-35% of bank (easier difficulty)
+• Experienced: 50% of bank (balanced risk/reward)
+• Experts: 60-75% of bank (maximum profit, highest risk)
+
+--------------------------------------------------------------------------------
+
+DEFENSE STRATEGY:
+
+If you expect to be targeted:
+• Keep guild bank lower (less attractive target)
+• Have withdrawal locks trigger unlock (you can access funds after heist 
+  attempt)
+• Use freed funds to strengthen your members for revenge heist
+
+--------------------------------------------------------------------------------
+
+RISK MANAGEMENT:
+
+BEFORE STARTING:
+• Calculate worst-case scenario (30% penalty)
+• Ensure you/team can afford failure
+• Consider smaller heist if funds are tight
+• Don't risk more than you can lose
+
+DURING HEIST:
+• Stay focused on minigames
+• Don't rush - accuracy > speed (except Driver role!)
+• Watch noise meter like a hawk
+• If one phase is hard, next might be easier
+
+--------------------------------------------------------------------------------
+
+PRACTICE MAKES PERFECT:
+
+• Start with solo heists to learn mechanics
+• Try different approaches to find your style
+• Learn from failures (check what went wrong)
+• Study successful heists (what worked?)
+• Build experience before attempting big multiplayer heists
+
+================================================================================
+                  ❓ FREQUENTLY ASKED QUESTIONS
+================================================================================
+
+Q: Can I heist on days other than Sunday?
+A: No, heists are strictly Sunday-only (UTC timezone).
+
+Q: Can regular guild members start heists?
+A: No, only guild leaders/owners can use the /heist command.
+
+Q: What if my leader isn't active?
+A: Consider joining a different guild or asking them to transfer leadership.
+
+Q: Can I do multiple heists in one Sunday?
+A: No, each guild gets ONE heist attempt per Sunday (success or fail counts).
+
+Q: What happens if I leave my guild after a heist?
+A: Penalties/rewards are processed immediately during the heist.
+
+Q: Can I target the same guild multiple times?
+A: Yes, but only one heist per Sunday, so wait until next Sunday.
+
+Q: Do I need all 5 roles for multiplayer?
+A: No! You can have 2-5 players. Roles are assigned based on team size.
+
+Q: What if someone disconnects during multiplayer heist?
+A: The heist will likely timeout and fail. Choose reliable team members!
+
+Q: Can I practice minigames?
+A: Not directly, but similar minigames appear in other bot features. 
+   Practice makes perfect!
+
+Q: How do I know what gear to buy?
+A: Start with stealth gear (reduces detection), then add speed/escape gear.
+
+Q: Can I steal from a guild with 0 coins?
+A: No, target must have at least 1,000 coins in their bank.
+
+Q: What's the best steal percentage?
+A: 50% is balanced. Higher = more risk but more reward.
+
+Q: Does my character level matter?
+A: No, heist success is purely skill-based (minigames) and gear-based.
+
+Q: Can guilds form alliances?
+A: The bot doesn't have formal alliances, but players can cooperate 
+   externally.
+
+================================================================================
+                          🎊 CONCLUSION
+================================================================================
+
+Heists are the MOST EXCITING and REWARDING feature in SORABOT! With the 
+right gear, strategy, and teamwork, you can pull off legendary robberies and 
+build your guild's wealth.
+
+REMEMBER:
+• Sundays only
+• Leaders initiate
+• Master the minigames
+• Buy heist gear
+• Team coordination is key
+• High risk, high reward
+
+Good luck, and may your heists be clean and profitable! 🏆
+
+================================================================================
+
+This guide was created for educational purposes. Always follow the bot's 
+rules and respect other guilds. Happy heisting! 🎭
+
+================================================================================
+                              END OF GUIDE
+================================================================================

@@ -835,6 +835,7 @@ class BlackjackView(discord.ui.View):
         net_result = winnings - self.bet
         
         embed = discord.Embed(title="🃏 Blackjack - Game Over", color=0x27ae60 if net_result > 0 else 0xe74c3c)
+        embed.set_author(name=interaction.user.display_name, icon_url=interaction.user.display_avatar.url)
         embed.add_field(name="Your Hand", value=f"{self.format_hand(self.player_hand)} (Value: {player_value})", inline=False)
         embed.add_field(name="Dealer Hand", value=f"{self.format_hand(self.dealer_hand)} (Value: {dealer_value})", inline=False)
         embed.add_field(name="Result", value=result_text, inline=False)
@@ -844,7 +845,18 @@ class BlackjackView(discord.ui.View):
         embed.add_field(name="💰 Wallet", value=f"{new_wallet:,} coins", inline=True)
         embed.add_field(name="🏦 Bank", value=f"{new_bank:,} coins", inline=True)
         
-        await interaction.response.edit_message(embed=embed, view=None)
+        # First, edit the ephemeral message to remove buttons
+        try:
+            await interaction.response.edit_message(content="Game finished! See results below.", embed=None, view=None)
+        except:
+            # If response already sent, try to edit the message directly
+            try:
+                await interaction.message.edit(content="Game finished! See results below.", embed=None, view=None)
+            except:
+                pass
+        
+        # Send public result message
+        await interaction.channel.send(embed=embed)
 
 class Casino(commands.Cog):
     def __init__(self, bot):
