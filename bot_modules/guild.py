@@ -28,13 +28,90 @@ def get_guild_role(user_id, guild_name, data):
         return "Member"
     return None
 
+class GuildJoinApprovalView(discord.ui.View):
+    """View for guild owner to approve/deny join requests"""
+    def __init__(self, owner_id, applicant_id, applicant_name, guild_name):
+        super().__init__(timeout=86400)  # 24 hour timeout
+        self.owner_id = str(owner_id)
+        self.applicant_id = str(applicant_id)
+        self.applicant_name = applicant_name
+        self.guild_name = guild_name
+    
+    @discord.ui.button(label="Approve", style=discord.ButtonStyle.success, emoji="✅")
+    async def approve_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if str(interaction.user.id) != self.owner_id:
+            await interaction.response.send_message("❌ Only the guild owner can approve requests!", ephemeral=True)
+            return
+        
+        try:
+            data = await load_data()
+            
+            # Check if applicant is still guildless
+            current_guild = get_user_guild(self.applicant_id, data)
+            if current_guild:
+                await interaction.response.edit_message(
+                    content=f"❌ **{self.applicant_name}** has already joined another guild!",
+                    view=None
+                )
+                return
+            
+            # Add to guild
+            data.setdefault("guild_members", {}).setdefault(self.guild_name, []).append(self.applicant_id)
+            await save_data(data, force=True)
+            
+            # Notify owner
+            await interaction.response.edit_message(
+                content=f"✅ **{self.applicant_name}** has been approved and joined **{self.guild_name}**!",
+                view=None
+            )
+            
+            # Try to DM the applicant
+            try:
+                applicant = await interaction.client.fetch_user(int(self.applicant_id))
+                embed = discord.Embed(
+                    title="🏰 Guild Application Approved!",
+                    description=f"Your request to join **{self.guild_name}** has been approved!",
+                    color=0x00ff00
+                )
+                await applicant.send(embed=embed)
+            except:
+                pass  # Couldn't DM, oh well
+                
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error: {e}", ephemeral=True)
+    
+    @discord.ui.button(label="Deny", style=discord.ButtonStyle.danger, emoji="❌")
+    async def deny_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if str(interaction.user.id) != self.owner_id:
+            await interaction.response.send_message("❌ Only the guild owner can deny requests!", ephemeral=True)
+            return
+        
+        # Notify owner
+        await interaction.response.edit_message(
+            content=f"❌ **{self.applicant_name}**'s request to join **{self.guild_name}** has been denied.",
+            view=None
+        )
+        
+        # Try to DM the applicant
+        try:
+            applicant = await interaction.client.fetch_user(int(self.applicant_id))
+            embed = discord.Embed(
+                title="🏰 Guild Application Denied",
+                description=f"Your request to join **{self.guild_name}** has been denied by the guild owner.",
+                color=0xff0000
+            )
+            await applicant.send(embed=embed)
+        except:
+            pass  # Couldn't DM, oh well
+
 class GuildJoinSelect(discord.ui.Select):
-    def __init__(self, user_id):
+    def __init__(self, user_id, bot):
         self.user_id = user_id
+        self.bot = bot
         
         # This will be populated when the view is created
         super().__init__(
-            placeholder="Choose a guild to join...",
+            placeholder="Choose a guild to request joining...",
             min_values=1,
             max_values=1,
             custom_id="guild_join_select"
@@ -56,40 +133,58 @@ class GuildJoinSelect(discord.ui.Select):
                 await interaction.response.send_message(f"❌ You're already in guild **{current_guild}**!", ephemeral=True)
                 return
             
-            # Join guild
-            if "guild_members" not in data:
-                data["guild_members"] = {}
-            if guild_name not in data["guild_members"]:
-                data["guild_members"][guild_name] = []
+            # Get guild owner
+            guild_data = data.get("guilds", {}).get(guild_name, {})
+            owner_id = guild_data.get("owner")
             
-            data["guild_members"][guild_name].append(self.user_id)
-            await save_data(data, force=True)
+            if not owner_id:
+                await interaction.response.send_message("❌ This guild has no owner!", ephemeral=True)
+                return
             
-            embed = discord.Embed(
-                title="🏰 Joined Guild!",
-                description=f"Successfully joined guild **{guild_name}**!",
-                color=0x00ff00
-            )
-            embed.add_field(name="👥 Members", value=str(len(data["guild_members"][guild_name])), inline=True)
-            embed.add_field(name="💰 Guild Bank", value=f"{data['guilds'][guild_name].get('bank', 0):,} coins", inline=True)
-            embed.add_field(name="📈 Benefits", value="• +5% bank interest\n• Access to guild bank\n• Member collaboration", inline=False)
-            
-            # Disable the view
-            for item in self.view.children:
-                item.disabled = True
-            
-            await interaction.response.edit_message(embed=embed, view=self.view)
+            # Send DM to guild owner with approval view
+            try:
+                owner = await self.bot.fetch_user(int(owner_id))
+                
+                embed = discord.Embed(
+                    title="🏰 New Guild Join Request",
+                    description=f"**{interaction.user.name}** wants to join **{guild_name}**!",
+                    color=0xff9500
+                )
+                embed.add_field(name="Applicant", value=f"<@{self.user_id}>", inline=True)
+                embed.add_field(name="Current Members", value=str(len(data.get("guild_members", {}).get(guild_name, []))), inline=True)
+                embed.set_footer(text="You have 24 hours to approve or deny this request.")
+                
+                approval_view = GuildJoinApprovalView(owner_id, self.user_id, interaction.user.name, guild_name)
+                
+                await owner.send(embed=embed, view=approval_view)
+                
+                # Notify applicant
+                await interaction.response.edit_message(
+                    content=f"✅ Your request to join **{guild_name}** has been sent to the guild owner!\nYou'll receive a DM when they respond.",
+                    embed=None,
+                    view=None
+                )
+                
+            except discord.Forbidden:
+                await interaction.response.send_message(
+                    "❌ Couldn't send DM to guild owner! They may have DMs disabled.",
+                    ephemeral=True
+                )
+            except Exception as e:
+                await interaction.response.send_message(f"❌ Error sending request: {e}", ephemeral=True)
+                
         except Exception as e:
             print(f"Error in guild join: {e}")
             await interaction.response.send_message(f"❌ An error occurred: {e}", ephemeral=True)
 
 class GuildJoinView(discord.ui.View):
-    def __init__(self, user_id):
+    def __init__(self, user_id, bot):
         super().__init__(timeout=180)
         self.user_id = str(user_id)
+        self.bot = bot
         
         # Add the select menu - will be populated when showing the view
-        self.select_menu = GuildJoinSelect(self.user_id)
+        self.select_menu = GuildJoinSelect(self.user_id, bot)
         self.add_item(self.select_menu)
     
     async def on_timeout(self):
@@ -237,6 +332,17 @@ class WithdrawModal(discord.ui.Modal, title="💸 Guild Bank Withdrawal"):
         user_guild = get_user_guild(user_id, data)
         if user_guild != self.guild_name:
             await interaction.response.send_message("❌ You're not a member of this guild!", ephemeral=True)
+            return
+        
+        # Check if guild bank is locked (Saturday contributions)
+        withdrawal_locks = data.get("withdrawal_locks", {})
+        if self.guild_name in withdrawal_locks and withdrawal_locks[self.guild_name].get("locked", False):
+            await interaction.response.send_message(
+                "🔒 **Guild Bank Locked!**\n\n"
+                "Your guild bank is locked due to Saturday contributions. "
+                "It will unlock on Sunday night (8 PM UTC) or when your guild is targeted by a heist attempt.",
+                ephemeral=True
+            )
             return
 
         # Check guild bank balance
@@ -390,9 +496,11 @@ class Guild(commands.Cog):
             if len(guild_list) > 10:
                 embed.add_field(name="And more...", value=f"+{len(guild_list) - 10} more guilds available in dropdown", inline=False)
         
-        # Create view and populate select menu
-        view = GuildJoinView(user_id)
+        # Create view and populate select menu (pass bot instance)
+        view = GuildJoinView(user_id, self.bot)
         view.select_menu.options = select_options
+        
+        embed.set_footer(text="📨 A join request will be sent to the guild owner for approval!")
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 

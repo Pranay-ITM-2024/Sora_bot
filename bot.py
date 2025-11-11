@@ -165,6 +165,14 @@ async def on_ready():
         interest_task.start()
         print('💰 Interest calculation task started')
     
+    if not saturday_contribution_task.is_running():
+        saturday_contribution_task.start()
+        print('💵 Saturday guild contribution task started')
+    
+    if not sunday_unlock_task.is_running():
+        sunday_unlock_task.start()
+        print('🔓 Sunday unlock task started')
+    
     # Update web server status
     try:
         from web_server import update_bot_status
@@ -302,6 +310,124 @@ async def interest_task():
         
     except Exception as e:
         logging.error(f"Interest calculation failed: {e}")
+
+@tasks.loop(hours=1)
+async def saturday_contribution_task():
+    """Check for Saturday and automatically contribute 75% of member wealth to guild bank"""
+    try:
+        now = datetime.datetime.utcnow()
+        
+        # Only run on Saturdays
+        if now.weekday() != 5:  # 5 = Saturday
+            return
+        
+        data = await data_manager.load_data()
+        
+        # Check if already ran today
+        last_contribution = data.get("_meta", {}).get("last_saturday_contribution")
+        if last_contribution:
+            last_date = datetime.datetime.fromisoformat(last_contribution).date()
+            if last_date == now.date():
+                return  # Already ran today
+        
+        logging.info("💰 Saturday guild contribution starting...")
+        
+        guild_members = data.get("guild_members", {})
+        guilds = data.get("guilds", {})
+        contributions = data.setdefault("saturday_contributions", {})
+        withdrawal_locks = data.setdefault("withdrawal_locks", {})
+        
+        total_contributed = 0
+        
+        # Process each guild
+        for guild_name, members in guild_members.items():
+            guild_data = guilds.get(guild_name, {})
+            guild_contributions = []
+            
+            for user_id in members:
+                # Calculate 75% of total worth
+                wallet = data.get("coins", {}).get(user_id, 0)
+                bank = data.get("bank", {}).get(user_id, 0)
+                total_worth = wallet + bank
+                
+                if total_worth <= 0:
+                    continue
+                
+                contribution = int(total_worth * 0.75)
+                
+                # Take from bank first, then wallet
+                if bank >= contribution:
+                    data.setdefault("bank", {})[user_id] = bank - contribution
+                else:
+                    data.setdefault("bank", {})[user_id] = 0
+                    remaining = contribution - bank
+                    data.setdefault("coins", {})[user_id] = wallet - remaining
+                
+                # Add to guild bank
+                guild_data["bank"] = guild_data.get("bank", 0) + contribution
+                
+                # Track contribution
+                contributions.setdefault(guild_name, {})[user_id] = {
+                    "amount": contribution,
+                    "timestamp": now.isoformat()
+                }
+                
+                guild_contributions.append(contribution)
+                total_contributed += contribution
+            
+            # Lock guild bank withdrawals until Sunday night or heist attempt
+            if guild_contributions:
+                withdrawal_locks[guild_name] = {
+                    "locked": True,
+                    "locked_since": now.isoformat(),
+                    "heist_attempted": False
+                }
+                
+                guilds[guild_name] = guild_data
+                logging.info(f"🔒 {guild_name} bank locked with {sum(guild_contributions):,} coins from {len(guild_contributions)} members")
+        
+        # Save updated data
+        data["guilds"] = guilds
+        data["saturday_contributions"] = contributions
+        data["withdrawal_locks"] = withdrawal_locks
+        data.setdefault("_meta", {})["last_saturday_contribution"] = now.isoformat()
+        
+        await data_manager.save_data(data, force=True)
+        
+        logging.info(f"✅ Saturday contributions complete: {total_contributed:,} coins contributed across all guilds")
+        
+    except Exception as e:
+        logging.error(f"Saturday contribution task failed: {e}")
+
+@tasks.loop(hours=1)
+async def sunday_unlock_task():
+    """Check for Sunday night and unlock guild banks"""
+    try:
+        now = datetime.datetime.utcnow()
+        
+        # Only run on Sunday after 8 PM UTC
+        if now.weekday() != 6 or now.hour < 20:  # 6 = Sunday, 20 = 8 PM
+            return
+        
+        data = await data_manager.load_data()
+        withdrawal_locks = data.get("withdrawal_locks", {})
+        
+        unlocked_count = 0
+        
+        for guild_name, lock_data in withdrawal_locks.items():
+            if lock_data.get("locked"):
+                lock_data["locked"] = False
+                lock_data["unlocked_at"] = now.isoformat()
+                unlocked_count += 1
+                logging.info(f"🔓 Unlocked {guild_name} guild bank")
+        
+        if unlocked_count > 0:
+            data["withdrawal_locks"] = withdrawal_locks
+            await data_manager.save_data(data, force=True)
+            logging.info(f"✅ Sunday unlock complete: {unlocked_count} guilds unlocked")
+        
+    except Exception as e:
+        logging.error(f"Sunday unlock task failed: {e}")
 
 # Admin commands for Firebase management
 @bot.command(name='sync')

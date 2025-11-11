@@ -30,6 +30,34 @@ def deduct_debt(user_id, amount, data):
     
     return remaining, debt_paid
 
+def get_total_balance(user_id, data):
+    """Get user's total balance (wallet + bank)"""
+    user_id = str(user_id)
+    wallet = data.get("coins", {}).get(user_id, 0)
+    bank = data.get("bank", {}).get(user_id, 0)
+    return wallet, bank, wallet + bank
+
+def deduct_bet(user_id, bet_amount, data):
+    """Deduct bet from wallet first, then bank if needed. Returns success boolean."""
+    user_id = str(user_id)
+    wallet = data.get("coins", {}).get(user_id, 0)
+    bank = data.get("bank", {}).get(user_id, 0)
+    total = wallet + bank
+    
+    if total < bet_amount:
+        return False  # Insufficient funds
+    
+    # Deduct from wallet first
+    if wallet >= bet_amount:
+        data.setdefault("coins", {})[user_id] = wallet - bet_amount
+    else:
+        # Take all from wallet, rest from bank
+        needed_from_bank = bet_amount - wallet
+        data.setdefault("coins", {})[user_id] = 0
+        data.setdefault("bank", {})[user_id] = bank - needed_from_bank
+    
+    return True
+
 def check_cooldown(user_id, command, data, cooldown_seconds=30):
     """Check if user is on cooldown for a command"""
     cooldowns = data.get("cooldowns", {})
@@ -142,11 +170,19 @@ class SlotsView(discord.ui.View):
     async def play_slots(self, interaction, bet):
         data = await load_data()
         user_id = str(interaction.user.id)
-        user_coins = data.get("coins", {}).get(user_id, 0)
         
-        if user_coins < bet:
-            await interaction.response.send_message(f"❌ You need {bet} coins to spin! Your balance: {user_coins}", ephemeral=True)
+        # Check total balance (wallet + bank)
+        wallet, bank, total = get_total_balance(user_id, data)
+        
+        if total < bet:
+            await interaction.response.send_message(
+                f"❌ Insufficient funds!\n💰 Wallet: {wallet:,} | 🏦 Bank: {bank:,}\n**Need:** {bet:,} coins",
+                ephemeral=True
+            )
             return
+        
+        # Deduct bet from wallet/bank
+        deduct_bet(user_id, bet, data)
         
         # Get bonuses
         effects = await get_gambling_effects(user_id, data)
@@ -193,16 +229,16 @@ class SlotsView(discord.ui.View):
             win_text = f"🛡️ Insurance activated! Refunded {refund} coins"
             await consume_item_effect(user_id, "insurance_scroll", data)
         
-        # Update balance
-        data.setdefault("coins", {})[user_id] = user_coins + net_result
+        # Add winnings to wallet (bet already deducted)
+        if winnings > 0:
+            current_wallet = data.get("coins", {}).get(user_id, 0)
+            data.setdefault("coins", {})[user_id] = current_wallet + winnings
+            add_transaction(user_id, winnings, f"Slots win", data, "credit")
         
-        # Add transaction
-        if net_result > 0:
-            add_transaction(user_id, net_result, f"Slots win (+{winnings-bet})", data, "credit")
-        else:
-            add_transaction(user_id, abs(net_result), f"Slots loss (-{abs(net_result)})", data, "debit")
+        await save_data(data, force=True)
         
-        await save_data(data)
+        # Get new balance for display
+        new_wallet, new_bank, new_total = get_total_balance(user_id, data)
         
         # Create result embed
         embed = discord.Embed(title="🎰 Slot Machine", color=0xf1c40f if winnings > 0 else 0xe74c3c)
@@ -210,7 +246,8 @@ class SlotsView(discord.ui.View):
         embed.add_field(name="Bet", value=f"{bet} coins", inline=True)
         embed.add_field(name="Won", value=f"{winnings} coins", inline=True)
         embed.add_field(name="Net", value=f"{'+'if net_result >= 0 else ''}{net_result} coins", inline=True)
-        embed.add_field(name="Balance", value=f"{user_coins + net_result:,} coins", inline=True)
+        embed.add_field(name="💰 Wallet", value=f"{new_wallet:,} coins", inline=True)
+        embed.add_field(name="🏦 Bank", value=f"{new_bank:,} coins", inline=True)
         
         if win_text:
             embed.add_field(name="Result", value=win_text, inline=False)
@@ -460,11 +497,10 @@ class RatRaceStartView(discord.ui.View):
         """Run the live race sequence"""
         lobby.started = True
         
-        # Deduct all bets
+        # Deduct all bets (from wallet + bank)
         data = await load_data()
         for user_id, bet_info in lobby.bets.items():
-            user_coins = data.get("coins", {}).get(user_id, 0)
-            data.setdefault("coins", {})[user_id] = user_coins - bet_info["amount"]
+            deduct_bet(user_id, bet_info["amount"], data)
             add_transaction(user_id, bet_info["amount"], "Rat race bet", data, "debit")
         await save_data(data, force=True)
         
@@ -636,11 +672,11 @@ class BetAmountModal(discord.ui.Modal, title="Place Your Bet"):
         user_id = str(interaction.user.id)
         data = await load_data()
         
-        # Check balance
-        user_coins = data.get("coins", {}).get(user_id, 0)
-        if user_coins < bet_amount:
+        # Check total balance (wallet + bank)
+        wallet, bank, total = get_total_balance(user_id, data)
+        if total < bet_amount:
             await interaction.response.send_message(
-                f"❌ You don't have enough coins! Balance: {user_coins}",
+                f"❌ Insufficient funds!\n💰 Wallet: {wallet:,} | 🏦 Bank: {bank:,}\n**Need:** {bet_amount:,} coins",
                 ephemeral=True
             )
             return
@@ -754,13 +790,13 @@ class BlackjackView(discord.ui.View):
     async def end_game(self, interaction, result):
         data = await load_data()
         user_id = str(interaction.user.id)
-        user_coins = data.get("coins", {}).get(user_id, 0)
         effects = await get_gambling_effects(user_id, data)
         
         player_value = self.calculate_hand_value(self.player_hand)
         dealer_value = self.calculate_hand_value(self.dealer_hand)
         
-        # Calculate winnings
+        # Calculate winnings (bet already deducted)
+        winnings = 0
         if result in ["player_win", "dealer_bust"]:
             if len(self.player_hand) == 2 and player_value == 21:  # Blackjack
                 winnings = int(self.bet * 2.5)
@@ -769,34 +805,34 @@ class BlackjackView(discord.ui.View):
                 winnings = self.bet * 2
                 result_text = "🎊 You win!"
         elif result == "tie":
-            winnings = self.bet
+            winnings = self.bet  # Return bet
             result_text = "🤝 Push (tie)"
         else:  # bust or dealer_win
-            winnings = 0
             result_text = "😔 You lose!"
             
-            # Apply insurance
+            # Apply insurance (refund to wallet)
             if effects["insurance"]:
                 refund = self.bet // 2
                 winnings = refund
                 result_text += f"\n🛡️ Insurance: +{refund} coins"
                 await consume_item_effect(user_id, "insurance_scroll", data)
         
-        net_result = winnings - self.bet
-        data.setdefault("coins", {})[user_id] = user_coins + net_result
-        
-        # Add transaction
-        if net_result > 0:
-            add_transaction(user_id, net_result, "Blackjack win", data, "credit")
-        elif net_result < 0:
-            add_transaction(user_id, abs(net_result), "Blackjack loss", data, "debit")
+        # Add winnings to wallet
+        if winnings > 0:
+            current_wallet = data.get("coins", {}).get(user_id, 0)
+            data.setdefault("coins", {})[user_id] = current_wallet + winnings
+            add_transaction(user_id, winnings, "Blackjack win", data, "credit")
         
         # Consume effects
         if winnings > self.bet and effects["win_chance_bonus"] > 0:
             await consume_item_effect(user_id, "lucky_potion", data)
             await consume_item_effect(user_id, "mega_lucky_potion", data)
         
-        await save_data(data)
+        await save_data(data, force=True)
+        
+        # Get new balance for display
+        new_wallet, new_bank, new_total = get_total_balance(user_id, data)
+        net_result = winnings - self.bet
         
         embed = discord.Embed(title="🃏 Blackjack - Game Over", color=0x27ae60 if net_result > 0 else 0xe74c3c)
         embed.add_field(name="Your Hand", value=f"{self.format_hand(self.player_hand)} (Value: {player_value})", inline=False)
@@ -805,7 +841,8 @@ class BlackjackView(discord.ui.View):
         embed.add_field(name="Bet", value=f"{self.bet} coins", inline=True)
         embed.add_field(name="Won", value=f"{winnings} coins", inline=True)
         embed.add_field(name="Net", value=f"{'+'if net_result >= 0 else ''}{net_result} coins", inline=True)
-        embed.add_field(name="Balance", value=f"{user_coins + net_result:,} coins", inline=True)
+        embed.add_field(name="💰 Wallet", value=f"{new_wallet:,} coins", inline=True)
+        embed.add_field(name="🏦 Bank", value=f"{new_bank:,} coins", inline=True)
         
         await interaction.response.edit_message(embed=embed, view=None)
 
@@ -834,17 +871,20 @@ class Casino(commands.Cog):
         user_id = str(interaction.user.id)
         data = await load_data()
         
-        # Initialize and check balance
-        user_coins = data.get("coins", {}).get(user_id, 0)
-        if user_coins < bet:
+        # Check total balance (wallet + bank)
+        wallet, bank, total = get_total_balance(user_id, data)
+        if total < bet:
             await interaction.response.send_message(
-                f"❌ You don't have enough coins! You need {bet} coins but only have {user_coins}.",
+                f"❌ You don't have enough coins! You need {bet} coins but have:\n💰 Wallet: {wallet:,} | 🏦 Bank: {bank:,} | Total: {total:,}",
                 ephemeral=True
             )
             return
         
-        # Deduct bet
-        data.setdefault("coins", {})[user_id] = user_coins - bet
+        # Deduct bet from wallet first, then bank
+        if not deduct_bet(user_id, bet, data):
+            await interaction.response.send_message("❌ Failed to deduct bet!", ephemeral=True)
+            return
+        
         add_transaction(user_id, bet, "Roulette bet", data, tx_type="debit")
         
         # Get gambling effects
@@ -855,22 +895,23 @@ class Casino(commands.Cog):
         color = "green" if result == 0 else "red" if result % 2 == 1 else "black"
         
         won = False
-        payout = 0
+        winnings = 0
         
         # Check win conditions
         choice_lower = choice.lower()
         if choice_lower == color:
             won = True
-            payout = bet * 2
+            winnings = bet * 2
         elif choice_lower.isdigit() and int(choice_lower) == result:
             won = True
-            payout = bet * 35
+            winnings = bet * 35
         
-        # Apply gambling effects
-        if won and payout > 0:
-            payout = int(payout * (1 + effects["payout_bonus"]))
-            data["coins"][user_id] += payout
-            add_transaction(user_id, payout, "Roulette win", data, tx_type="credit")
+        # Apply gambling effects and add to wallet
+        if won and winnings > 0:
+            winnings = int(winnings * (1 + effects["payout_bonus"]))
+            current_wallet = data.get("coins", {}).get(user_id, 0)
+            data.setdefault("coins", {})[user_id] = current_wallet + winnings
+            add_transaction(user_id, winnings, "Roulette win", data, tx_type="credit")
             
             # Consume luck potions on win
             if effects["payout_bonus"] > 0:
@@ -878,6 +919,10 @@ class Casino(commands.Cog):
         
         # Save data
         await save_data(data, force=True)
+        
+        # Get new balance for display
+        new_wallet, new_bank, new_total = get_total_balance(user_id, data)
+        net_result = winnings - bet
         
         # Create embed
         embed = discord.Embed(
@@ -888,13 +933,15 @@ class Casino(commands.Cog):
         embed.add_field(name="Your Bet", value=f"{bet} on {choice}", inline=True)
         
         if won:
-            embed.add_field(name="Outcome", value=f"✅ Won {payout:,} coins!", inline=False)
+            embed.add_field(name="Outcome", value=f"✅ Won {winnings:,} coins!", inline=False)
             if effects["payout_bonus"] > 0:
                 embed.add_field(name="🍀 Luck Bonus", value=f"+{effects['payout_bonus']*100:.0f}% payout", inline=True)
         else:
             embed.add_field(name="Outcome", value=f"❌ Lost {bet:,} coins", inline=False)
         
-        embed.add_field(name="New Balance", value=f"💰 {data['coins'][user_id]:,} coins", inline=False)
+        embed.add_field(name="Net", value=f"{'+'if net_result >= 0 else ''}{net_result:,} coins", inline=True)
+        embed.add_field(name="💰 Wallet", value=f"{new_wallet:,} coins", inline=True)
+        embed.add_field(name="🏦 Bank", value=f"{new_bank:,} coins", inline=True)
         
         await interaction.response.send_message(embed=embed)
 
@@ -962,10 +1009,17 @@ class Casino(commands.Cog):
             await interaction.response.send_message(f"⏰ Cooldown active! Wait {cooldown} seconds.", ephemeral=True)
             return
         
-        user_coins = data.get("coins", {}).get(user_id, 0)
-        if user_coins < bet:
-            await interaction.response.send_message(f"❌ You need {bet} coins! Your balance: {user_coins}", ephemeral=True)
+        # Check total balance (wallet + bank)
+        wallet, bank, total = get_total_balance(user_id, data)
+        if total < bet:
+            await interaction.response.send_message(
+                f"❌ Insufficient funds!\n💰 Wallet: {wallet:,} | 🏦 Bank: {bank:,}\n**Need:** {bet:,} coins",
+                ephemeral=True
+            )
             return
+        
+        # Deduct bet from wallet/bank
+        deduct_bet(user_id, bet, data)
         
         # Get effects and calculate win chance
         effects = await get_gambling_effects(user_id, data)
@@ -976,32 +1030,26 @@ class Casino(commands.Cog):
         result = "heads" if random.random() < win_chance else "tails"
         won = (choice == result)
         
+        winnings = 0
         if won:
             winnings = bet * 2
-            net_result = bet
+            # Add winnings to wallet
+            current_wallet = data.get("coins", {}).get(user_id, 0)
+            data.setdefault("coins", {})[user_id] = current_wallet + winnings
             result_text = f"🎉 You won! The coin landed on {result}!"
             color = 0x27ae60
+            add_transaction(user_id, winnings, "Coinflip win", data, "credit")
         else:
-            winnings = 0
-            net_result = -bet
             result_text = f"😔 You lost! The coin landed on {result}."
             color = 0xe74c3c
             
-            # Apply insurance
+            # Apply insurance (refund to wallet)
             if effects["insurance"]:
                 refund = bet // 2
-                net_result += refund
+                current_wallet = data.get("coins", {}).get(user_id, 0)
+                data.setdefault("coins", {})[user_id] = current_wallet + refund
                 result_text += f"\n🛡️ Insurance activated! Refunded {refund} coins"
                 await consume_item_effect(user_id, "insurance_scroll", data)
-        
-        # Update balance
-        data.setdefault("coins", {})[user_id] = user_coins + net_result
-        
-        # Add transaction
-        if net_result > 0:
-            add_transaction(user_id, net_result, "Coinflip win", data, "credit")
-        else:
-            add_transaction(user_id, abs(net_result), "Coinflip loss", data, "debit")
         
         # Consume luck effects
         if won and effects["win_chance_bonus"] > 0:
@@ -1009,9 +1057,12 @@ class Casino(commands.Cog):
             await consume_item_effect(user_id, "mega_lucky_potion", data)
         
         set_cooldown(user_id, "coinflip", data)
-        await save_data(data)
+        await save_data(data, force=True)
         
         # Show result
+        new_wallet, new_bank, new_total = get_total_balance(user_id, data)
+        net_result = winnings - bet
+        
         coin_emoji = "🪙" if result == "heads" else "🔄"
         embed = discord.Embed(title=f"{coin_emoji} Coinflip", color=color)
         embed.add_field(name="Your Choice", value=choice.title(), inline=True)
@@ -1019,7 +1070,8 @@ class Casino(commands.Cog):
         embed.add_field(name="Outcome", value="WIN" if won else "LOSS", inline=True)
         embed.add_field(name="Bet", value=f"{bet} coins", inline=True)
         embed.add_field(name="Net", value=f"{'+'if net_result >= 0 else ''}{net_result} coins", inline=True)
-        embed.add_field(name="Balance", value=f"{user_coins + net_result:,} coins", inline=True)
+        embed.add_field(name="💰 Wallet", value=f"{new_wallet:,} coins", inline=True)
+        embed.add_field(name="🏦 Bank", value=f"{new_bank:,} coins", inline=True)
         embed.description = result_text
         
         if effects["win_chance_bonus"] > 0:
@@ -1044,10 +1096,17 @@ class Casino(commands.Cog):
             await interaction.response.send_message(f"⏰ Cooldown active! Wait {cooldown} seconds.", ephemeral=True)
             return
         
-        user_coins = data.get("coins", {}).get(user_id, 0)
-        if user_coins < bet:
-            await interaction.response.send_message(f"❌ You need {bet} coins! Your balance: {user_coins}", ephemeral=True)
+        # Check total balance (wallet + bank)
+        wallet, bank, total = get_total_balance(user_id, data)
+        if total < bet:
+            await interaction.response.send_message(
+                f"❌ Insufficient funds!\n💰 Wallet: {wallet:,} | 🏦 Bank: {bank:,}\n**Need:** {bet:,} coins",
+                ephemeral=True
+            )
             return
+        
+        # Deduct bet from wallet/bank
+        deduct_bet(user_id, bet, data)
         
         # Create deck and deal initial hands
         suits = ['♠️', '♥️', '♦️', '♣️']

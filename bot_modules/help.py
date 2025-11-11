@@ -69,27 +69,32 @@ class HelpCog(commands.Cog):
         embed.add_field(
             name="🏰 Guild System", 
             value="`/guild_create` - Create your own guild\n"
-                  "`/guild_join` - Join guild via dropdown menu\n"
+                  "`/guild_join` - Request to join (owner approval required)\n"
                   "`/guild_leave` - Leave current guild\n"
                   "`/guild_invite` - Invite users (owner/officer)\n"
                   "`/guild_bank` - Deposit/withdraw from guild bank\n"
                   "`/guild_info` - View guild details\n"
                   "`/guild_members` - List all members\n"
                   "`/heist` - 🏦 Sunday heists! Rob other guilds\n"
-                  "**Bonuses:** Shop discounts, bank interest, heists", 
+                  "**Saturday:** 75% of wealth auto-contributed to guild\n"
+                  "**Withdrawal Lock:** Until Sunday 8PM or heist attempt", 
             inline=False
         )
         
         embed.add_field(
             name="🏦 Heist System (Sundays Only!)",
-            value="**Interactive guild vs guild heists**\n"
-                  "• 3 phases: Entry, Vault, Escape\n"
-                  "• Choose approach: Stealth, Fast, or Tech\n"
-                  "• Manage noise to avoid detection\n"
-                  "• Use heist gear for bonuses\n"
+            value="**GUILD LEADERS ONLY** can initiate heists\n"
+                  "**One heist per guild per Sunday**\n\n"
+                  "**Solo Mode:** Leader goes alone (traditional gameplay)\n"
+                  "**Multiplayer (2-5 players):** Leader selects team\n"
+                  "• **Roles:** Leader, Hacker, Muscle, Driver, Scout\n"
+                  "• Each role has unique tasks (3 phases)\n"
+                  "• If ANY member fails, ENTIRE team fails!\n"
+                  "• Use heist gear for bonuses (shop)\n"
                   "• Steal up to 75% of target guild bank\n"
-                  "• Failed heist = 30% penalty\n"
-                  "**Tip:** Buy heist gear in shop!",
+                  "• Fail penalty: 30% split among team\n"
+                  "• Success: 10% split as personal rewards\n"
+                  "**Unlocks:** Target guild withdrawals after heist",
             inline=False
         )
         
