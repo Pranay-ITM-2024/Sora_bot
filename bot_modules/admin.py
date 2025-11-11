@@ -87,6 +87,124 @@ class Admin(commands.Cog):
         
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
+    @app_commands.command(name="givecoin", description="Give coins to a user (admin only).")
+    @app_commands.describe(user="User to give coins to", amount="Amount of coins to give", location="Where to add coins (wallet/bank)")
+    async def givecoin(self, interaction: discord.Interaction, user: discord.User, amount: int, location: str = "wallet"):
+        # Check if user is bot owner or has admin permissions
+        if interaction.user.id != interaction.guild.owner_id and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ You don't have permission to use this command!", ephemeral=True)
+            return
+        
+        if amount <= 0:
+            await interaction.response.send_message("❌ Amount must be positive!", ephemeral=True)
+            return
+        
+        location = location.lower()
+        if location not in ["wallet", "bank"]:
+            await interaction.response.send_message("❌ Location must be either 'wallet' or 'bank'!", ephemeral=True)
+            return
+        
+        data = await load_data()
+        user_id = str(user.id)
+        
+        # Add coins to the specified location
+        if location == "wallet":
+            current = data.get("coins", {}).get(user_id, 0)
+            data.setdefault("coins", {})[user_id] = current + amount
+        else:  # bank
+            current = data.get("bank", {}).get(user_id, 0)
+            data.setdefault("bank", {})[user_id] = current + amount
+        
+        await save_data(data)
+        
+        embed = discord.Embed(title="💰 Coins Given", color=0x00ff00)
+        embed.set_thumbnail(url=user.display_avatar.url)
+        embed.add_field(name="Recipient", value=user.mention, inline=True)
+        embed.add_field(name="Amount", value=f"{amount:,} coins", inline=True)
+        embed.add_field(name="Location", value=location.title(), inline=True)
+        
+        new_amount = data.get("coins" if location == "wallet" else "bank", {}).get(user_id, 0)
+        embed.add_field(name=f"New {location.title()} Balance", value=f"{new_amount:,} coins", inline=False)
+        embed.set_footer(text=f"Admin: {interaction.user.display_name}")
+        
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="takecoin", description="Take coins from a user (admin only).")
+    @app_commands.describe(user="User to take coins from", amount="Amount of coins to take", location="Where to take coins from (wallet/bank/both)")
+    async def takecoin(self, interaction: discord.Interaction, user: discord.User, amount: int, location: str = "wallet"):
+        # Check if user is bot owner or has admin permissions
+        if interaction.user.id != interaction.guild.owner_id and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ You don't have permission to use this command!", ephemeral=True)
+            return
+        
+        if amount <= 0:
+            await interaction.response.send_message("❌ Amount must be positive!", ephemeral=True)
+            return
+        
+        location = location.lower()
+        if location not in ["wallet", "bank", "both"]:
+            await interaction.response.send_message("❌ Location must be 'wallet', 'bank', or 'both'!", ephemeral=True)
+            return
+        
+        data = await load_data()
+        user_id = str(user.id)
+        
+        wallet = data.get("coins", {}).get(user_id, 0)
+        bank = data.get("bank", {}).get(user_id, 0)
+        
+        taken_from = []
+        total_taken = 0
+        
+        if location == "wallet":
+            taken = min(amount, wallet)
+            data.setdefault("coins", {})[user_id] = wallet - taken
+            total_taken = taken
+            taken_from.append(f"💰 Wallet: {taken:,}")
+        elif location == "bank":
+            taken = min(amount, bank)
+            data.setdefault("bank", {})[user_id] = bank - taken
+            total_taken = taken
+            taken_from.append(f"🏦 Bank: {taken:,}")
+        else:  # both
+            # Take from wallet first, then bank
+            if wallet >= amount:
+                data.setdefault("coins", {})[user_id] = wallet - amount
+                total_taken = amount
+                taken_from.append(f"💰 Wallet: {amount:,}")
+            else:
+                # Take all from wallet, rest from bank
+                remaining = amount - wallet
+                taken_from_bank = min(remaining, bank)
+                data.setdefault("coins", {})[user_id] = 0
+                data.setdefault("bank", {})[user_id] = bank - taken_from_bank
+                total_taken = wallet + taken_from_bank
+                if wallet > 0:
+                    taken_from.append(f"💰 Wallet: {wallet:,}")
+                if taken_from_bank > 0:
+                    taken_from.append(f"🏦 Bank: {taken_from_bank:,}")
+        
+        await save_data(data)
+        
+        embed = discord.Embed(title="💸 Coins Taken", color=0xe74c3c)
+        embed.set_thumbnail(url=user.display_avatar.url)
+        embed.add_field(name="Target", value=user.mention, inline=True)
+        embed.add_field(name="Requested", value=f"{amount:,} coins", inline=True)
+        embed.add_field(name="Actually Taken", value=f"{total_taken:,} coins", inline=True)
+        
+        if taken_from:
+            embed.add_field(name="Taken From", value="\n".join(taken_from), inline=False)
+        
+        new_wallet = data.get("coins", {}).get(user_id, 0)
+        new_bank = data.get("bank", {}).get(user_id, 0)
+        embed.add_field(name="New Balances", value=f"💰 {new_wallet:,} | 🏦 {new_bank:,}", inline=False)
+        
+        if total_taken < amount:
+            embed.set_footer(text=f"⚠️ User didn't have enough coins | Admin: {interaction.user.display_name}")
+        else:
+            embed.set_footer(text=f"Admin: {interaction.user.display_name}")
+        
+        await interaction.response.send_message(embed=embed)
+
     @app_commands.command(name="economy_status", description="Show economy system status (admin only).")
     async def economy_status(self, interaction: discord.Interaction):
         # Check if user has admin permissions

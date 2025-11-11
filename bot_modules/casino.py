@@ -240,6 +240,9 @@ class SlotsView(discord.ui.View):
         # Get new balance for display
         new_wallet, new_bank, new_total = get_total_balance(user_id, data)
         
+        # Check if it's a jackpot (three of a kind) for announcement
+        is_jackpot = reel1 == reel2 == reel3
+        
         # Create result embed
         embed = discord.Embed(title="🎰 Slot Machine", color=0xf1c40f if winnings > 0 else 0xe74c3c)
         embed.add_field(name="Reels", value=f"[ {reel1} | {reel2} | {reel3} ]", inline=False)
@@ -254,6 +257,25 @@ class SlotsView(discord.ui.View):
         
         view = SlotsView(user_id)
         await interaction.response.edit_message(embed=embed, view=view)
+        
+        # Send public announcement for jackpots
+        if is_jackpot:
+            multipliers = {"🍒": 3, "🍋": 4, "🍊": 5, "🍇": 8, "⭐": 15, "💎": 50}
+            multiplier = multipliers.get(reel1, 3)
+            
+            announcement = discord.Embed(
+                title="🎰💰 JACKPOT ALERT! 💰🎰",
+                description=f"**{interaction.user.mention}** just hit a JACKPOT!",
+                color=0xFFD700  # Gold color
+            )
+            announcement.add_field(name="Winning Combo", value=f"[ {reel1} | {reel2} | {reel3} ]", inline=False)
+            announcement.add_field(name="Bet Amount", value=f"{bet:,} coins", inline=True)
+            announcement.add_field(name="Multiplier", value=f"x{multiplier}", inline=True)
+            announcement.add_field(name="Total Winnings", value=f"🎉 **{winnings:,} coins!** 🎉", inline=True)
+            announcement.set_thumbnail(url=interaction.user.display_avatar.url)
+            announcement.set_footer(text="🎰 Try your luck with /slots!")
+            
+            await interaction.channel.send(embed=announcement)
 
 # ============================================
 # RAT RACE SYSTEM - Multiplayer Live Racing
