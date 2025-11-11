@@ -8,6 +8,27 @@ from datetime import datetime, timedelta
 import random
 from .database import load_data, save_data
 
+def deduct_debt(user_id, amount, data):
+    """Deduct outstanding debt from earnings. Returns (remaining_amount, debt_paid)"""
+    user_id = str(user_id)
+    debt = data.get("debt", {}).get(user_id, 0)
+    
+    if debt <= 0:
+        return amount, 0
+    
+    if amount >= debt:
+        # Can pay off all debt
+        remaining = amount - debt
+        debt_paid = debt
+        data.setdefault("debt", {})[user_id] = 0
+    else:
+        # Partial debt payment
+        remaining = 0
+        debt_paid = amount
+        data.setdefault("debt", {})[user_id] = debt - amount
+    
+    return remaining, debt_paid
+
 def get_rarity_color(rarity):
     """Get color for item rarity"""
     colors = {
@@ -167,12 +188,21 @@ class Economy(commands.Cog):
 
     @app_commands.command(name="balance", description="Check your wallet and bank balance.")
     async def balance(self, interaction: discord.Interaction):
-        user_id = interaction.user.id
-        coins, bank = await get_balance(user_id)
+        user_id = str(interaction.user.id)
+        data = await load_data()
+        coins = data.get("coins", {}).get(user_id, 0)
+        bank = data.get("bank", {}).get(user_id, 0)
+        debt = data.get("debt", {}).get(user_id, 0)
+        
         embed = discord.Embed(title=f"{interaction.user.display_name}'s Balance", color=0x00ff99)
         embed.add_field(name="💰 Wallet", value=f"{coins:,} coins", inline=True)
         embed.add_field(name="🏦 Bank", value=f"{bank:,} coins", inline=True)
         embed.add_field(name="💎 Total", value=f"{coins + bank:,} coins", inline=True)
+        
+        if debt > 0:
+            embed.add_field(name="💳 Outstanding Debt", value=f"{debt:,} coins", inline=False)
+            embed.set_footer(text="⚠️ Debt will be automatically deducted from your future earnings!")
+        
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="daily", description="Claim your daily reward.")
@@ -231,8 +261,11 @@ class Economy(commands.Cog):
         final_amount = int(daily_amount * multiplier)
         bonus_amount = final_amount - daily_amount
         
+        # Deduct any outstanding debt
+        remaining_amount, debt_paid = deduct_debt(user_id, final_amount, data)
+        
         # Update balance
-        coins = data.get("coins", {}).get(user_id, 0) + final_amount
+        coins = data.get("coins", {}).get(user_id, 0) + remaining_amount
         data.setdefault("coins", {})[user_id] = coins
         data.setdefault("last_daily", {})[user_id] = now.strftime("%Y-%m-%d")
         
@@ -256,6 +289,14 @@ class Economy(commands.Cog):
                 embed.add_field(name="🎁 Active Bonuses", value="\n".join(bonuses), inline=False)
         else:
             embed.add_field(name="Total Received", value=f"{final_amount:,} coins", inline=True)
+        
+        if debt_paid > 0:
+            embed.add_field(name="💳 Debt Paid", value=f"-{debt_paid:,} coins", inline=True)
+            embed.add_field(name="Added to Wallet", value=f"+{remaining_amount:,} coins", inline=True)
+            remaining_debt = data.get("debt", {}).get(user_id, 0)
+            if remaining_debt > 0:
+                embed.add_field(name="⚠️ Remaining Debt", value=f"{remaining_debt:,} coins", inline=True)
+        
         embed.add_field(name="New Balance", value=f"💵 {coins:,} coins", inline=False)
         embed.set_footer(text="💡 Tip: Equip Piggy Bank or use Wealth Potion for bonuses!")
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -316,8 +357,11 @@ class Economy(commands.Cog):
         final_amount = int(weekly_amount * multiplier)
         bonus_amount = final_amount - weekly_amount
         
+        # Deduct any outstanding debt
+        remaining_amount, debt_paid = deduct_debt(user_id, final_amount, data)
+        
         # Update balance
-        coins = data.get("coins", {}).get(user_id, 0) + final_amount
+        coins = data.get("coins", {}).get(user_id, 0) + remaining_amount
         data.setdefault("coins", {})[user_id] = coins
         data.setdefault("last_weekly", {})[user_id] = now.isoformat()
         
@@ -341,6 +385,14 @@ class Economy(commands.Cog):
                 embed.add_field(name="🎁 Active Bonuses", value="\n".join(bonuses), inline=False)
         else:
             embed.add_field(name="Total Received", value=f"{final_amount:,} coins", inline=True)
+        
+        if debt_paid > 0:
+            embed.add_field(name="💳 Debt Paid", value=f"-{debt_paid:,} coins", inline=True)
+            embed.add_field(name="Added to Wallet", value=f"+{remaining_amount:,} coins", inline=True)
+            remaining_debt = data.get("debt", {}).get(user_id, 0)
+            if remaining_debt > 0:
+                embed.add_field(name="⚠️ Remaining Debt", value=f"{remaining_debt:,} coins", inline=True)
+        
         embed.add_field(name="New Balance", value=f"💵 {coins:,} coins", inline=False)
         embed.set_footer(text="💡 Tip: Equip Piggy Bank or use Wealth Potion for bonuses!")
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -587,24 +639,38 @@ class Economy(commands.Cog):
                 if fine_from_bank > 0:
                     embed.add_field(name="💳 Taken From", value=f"Wallet: {fine_from_wallet:,}\nBank: {fine_from_bank:,}", inline=True)
             else:
-                # Not enough money for full fine - take everything they have
-                fine_amount = total_robber_money
+                # Not enough money for full fine - take everything they have and add debt
+                required_fine = int(target_coins * fine_percent)
+                paid_amount = total_robber_money
+                debt_amount = required_fine - paid_amount
+                
+                # Take all their money
                 data.setdefault("coins", {})[robber_id] = 0
                 data.setdefault("bank", {})[robber_id] = 0
-                data.setdefault("coins", {})[target_id] = target_coins + fine_amount
+                
+                # Give what they can pay to target
+                if paid_amount > 0:
+                    data.setdefault("coins", {})[target_id] = target_coins + paid_amount
+                
+                # Add debt to robber
+                data.setdefault("debt", {})[robber_id] = data.get("debt", {}).get(robber_id, 0) + debt_amount
                 
                 embed = discord.Embed(title="🚔 Robbery Failed!", color=0xe74c3c)
                 embed.add_field(name="Target", value=user.mention, inline=True)
-                embed.add_field(name="Fine Paid", value=f"{fine_amount:,} coins (all your money!)", inline=True)
+                embed.add_field(name="Fine Required", value=f"{required_fine:,} coins", inline=True)
+                embed.add_field(name="Paid Now", value=f"{paid_amount:,} coins (all your money!)", inline=False)
+                embed.add_field(name="💳 Outstanding Debt", value=f"{debt_amount:,} coins", inline=False)
+                embed.set_footer(text="⚠️ Debt will be deducted from future earnings!")
             
             embed.add_field(name="Success Rate", value=f"{success_rate*100:.1f}%", inline=True)
             embed.description = "You were caught and had to pay a fine!"
             
             # Add transactions
-            if fine_amount > 0:
+            actual_fine_paid = fine_amount if total_robber_money >= fine_amount else total_robber_money
+            if actual_fine_paid > 0:
                 now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
-                robber_tx = {"time": now, "type": "debit", "amount": fine_amount, "reason": f"Failed robbery fine to {user.display_name}"}
-                target_tx = {"time": now, "type": "credit", "amount": fine_amount, "reason": f"Robbery protection from {interaction.user.display_name}"}
+                robber_tx = {"time": now, "type": "debit", "amount": actual_fine_paid, "reason": f"Failed robbery fine to {user.display_name}"}
+                target_tx = {"time": now, "type": "credit", "amount": actual_fine_paid, "reason": f"Robbery protection from {interaction.user.display_name}"}
                 
                 data.setdefault("transactions", {}).setdefault(robber_id, []).append(robber_tx)
                 data.setdefault("transactions", {}).setdefault(target_id, []).append(target_tx)

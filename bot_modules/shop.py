@@ -68,6 +68,50 @@ SHOP_ITEMS = {
             "desc": "Permanent +25% rob success rate (equip to activate)",
             "type": "equipment"
         }
+    },
+    "🔧 Heist Gear": {
+        "lockpick_pro": {
+            "name": "🔓 Pro Lockpick",
+            "price": 3500,
+            "desc": "+15% stealth, +10% speed for heists (equip to activate)",
+            "type": "equipment"
+        },
+        "night_vision_goggles": {
+            "name": "👓 Night Vision Goggles",
+            "price": 4000,
+            "desc": "+20% stealth, -15% detection for heists (equip to activate)",
+            "type": "equipment"
+        },
+        "smoke_bomb": {
+            "name": "💣 Smoke Bomb",
+            "price": 1500,
+            "desc": "+25% escape, +10% stealth (consumable, 1 use)",
+            "type": "consumable"
+        },
+        "master_disguise": {
+            "name": "🎭 Master Disguise",
+            "price": 5000,
+            "desc": "+30% stealth, -20% detection for heists (equip to activate)",
+            "type": "equipment"
+        },
+        "getaway_car": {
+            "name": "🚗 Getaway Car",
+            "price": 7500,
+            "desc": "+30% escape, +15% speed for heists (equip to activate)",
+            "type": "equipment"
+        },
+        "hacking_device": {
+            "name": "💻 Hacking Device",
+            "price": 6000,
+            "desc": "+25% security bypass, +10% speed for heists (equip to activate)",
+            "type": "equipment"
+        },
+        "thermal_drill": {
+            "name": "🔥 Thermal Drill",
+            "price": 4500,
+            "desc": "+20% speed, +10% noise for heists (equip to activate)",
+            "type": "equipment"
+        }
     }
 }
 

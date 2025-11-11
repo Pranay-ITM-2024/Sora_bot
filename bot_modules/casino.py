@@ -9,6 +9,27 @@ import random
 from datetime import datetime, timedelta
 from .database import load_data, save_data
 
+def deduct_debt(user_id, amount, data):
+    """Deduct outstanding debt from earnings. Returns (remaining_amount, debt_paid)"""
+    user_id = str(user_id)
+    debt = data.get("debt", {}).get(user_id, 0)
+    
+    if debt <= 0:
+        return amount, 0
+    
+    if amount >= debt:
+        # Can pay off all debt
+        remaining = amount - debt
+        debt_paid = debt
+        data.setdefault("debt", {})[user_id] = 0
+    else:
+        # Partial debt payment
+        remaining = 0
+        debt_paid = amount
+        data.setdefault("debt", {})[user_id] = debt - amount
+    
+    return remaining, debt_paid
+
 def check_cooldown(user_id, command, data, cooldown_seconds=30):
     """Check if user is on cooldown for a command"""
     cooldowns = data.get("cooldowns", {})

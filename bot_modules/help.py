@@ -75,7 +75,21 @@ class HelpCog(commands.Cog):
                   "`/guild_bank` - Deposit/withdraw from guild bank\n"
                   "`/guild_info` - View guild details\n"
                   "`/guild_members` - List all members\n"
-                  "**Bonuses:** Shop discounts, bank interest", 
+                  "`/heist` - 🏦 Sunday heists! Rob other guilds\n"
+                  "**Bonuses:** Shop discounts, bank interest, heists", 
+            inline=False
+        )
+        
+        embed.add_field(
+            name="🏦 Heist System (Sundays Only!)",
+            value="**Interactive guild vs guild heists**\n"
+                  "• 3 phases: Entry, Vault, Escape\n"
+                  "• Choose approach: Stealth, Fast, or Tech\n"
+                  "• Manage noise to avoid detection\n"
+                  "• Use heist gear for bonuses\n"
+                  "• Steal up to 75% of target guild bank\n"
+                  "• Failed heist = 30% penalty\n"
+                  "**Tip:** Buy heist gear in shop!",
             inline=False
         )
         
