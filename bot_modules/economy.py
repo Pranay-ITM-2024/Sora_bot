@@ -558,16 +558,45 @@ class Economy(commands.Cog):
         else:
             # Failed!
             robber_coins = data.get("coins", {}).get(robber_id, 0)
-            fine_amount = min(robber_coins, int(target_coins * fine_percent))
+            robber_bank = data.get("bank", {}).get(robber_id, 0)
+            total_robber_money = robber_coins + robber_bank
             
-            if fine_amount > 0:
-                # Pay fine to target
-                data.setdefault("coins", {})[robber_id] = robber_coins - fine_amount
+            # Calculate fine (max 10% of target's coins)
+            fine_amount = int(target_coins * fine_percent)
+            
+            # Take fine from wallet first, then bank if needed
+            if total_robber_money >= fine_amount:
+                if robber_coins >= fine_amount:
+                    # Take from wallet only
+                    data.setdefault("coins", {})[robber_id] = robber_coins - fine_amount
+                    fine_from_wallet = fine_amount
+                    fine_from_bank = 0
+                else:
+                    # Take all from wallet, rest from bank
+                    fine_from_wallet = robber_coins
+                    fine_from_bank = fine_amount - robber_coins
+                    data.setdefault("coins", {})[robber_id] = 0
+                    data.setdefault("bank", {})[robber_id] = robber_bank - fine_from_bank
+                
+                # Give fine to target's wallet
                 data.setdefault("coins", {})[target_id] = target_coins + fine_amount
+                
+                embed = discord.Embed(title="🚔 Robbery Failed!", color=0xe74c3c)
+                embed.add_field(name="Target", value=user.mention, inline=True)
+                embed.add_field(name="Fine Paid", value=f"{fine_amount:,} coins", inline=True)
+                if fine_from_bank > 0:
+                    embed.add_field(name="💳 Taken From", value=f"Wallet: {fine_from_wallet:,}\nBank: {fine_from_bank:,}", inline=True)
+            else:
+                # Not enough money for full fine - take everything they have
+                fine_amount = total_robber_money
+                data.setdefault("coins", {})[robber_id] = 0
+                data.setdefault("bank", {})[robber_id] = 0
+                data.setdefault("coins", {})[target_id] = target_coins + fine_amount
+                
+                embed = discord.Embed(title="🚔 Robbery Failed!", color=0xe74c3c)
+                embed.add_field(name="Target", value=user.mention, inline=True)
+                embed.add_field(name="Fine Paid", value=f"{fine_amount:,} coins (all your money!)", inline=True)
             
-            embed = discord.Embed(title="🚔 Robbery Failed!", color=0xe74c3c)
-            embed.add_field(name="Target", value=user.mention, inline=True)
-            embed.add_field(name="Fine Paid", value=f"{fine_amount:,} coins", inline=True)
             embed.add_field(name="Success Rate", value=f"{success_rate*100:.1f}%", inline=True)
             embed.description = "You were caught and had to pay a fine!"
             
