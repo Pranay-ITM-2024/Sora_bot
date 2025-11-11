@@ -119,9 +119,10 @@ SHOP_ITEMS = {
 
 class PurchaseView(discord.ui.View):
     """Confirmation view for purchasing"""
-    def __init__(self, user_id, item_key, item_data, category_name):
+    def __init__(self, user_id, guild_id, item_key, item_data, category_name):
         super().__init__(timeout=60)
         self.user_id = user_id
+        self.guild_id = guild_id
         self.item_key = item_key
         self.item_data = item_data
         self.category_name = category_name
@@ -133,24 +134,28 @@ class PurchaseView(discord.ui.View):
             return
         
         data = await load_data()
+        from .database import get_server_data, save_server_data
+        server_data = get_server_data(data, self.guild_id)
+        
         price = self.item_data['price']
         
         # Try to deduct from wallet + bank combined
-        success, message, from_wallet, from_bank = deduct_combined_balance(self.user_id, price, data)
+        success, message, from_wallet, from_bank = deduct_combined_balance(self.user_id, price, server_data)
         
         if not success:
             await interaction.response.send_message(message, ephemeral=True)
             return
         
         # Purchase the item - add to inventory
-        data.setdefault("inventories", {}).setdefault(self.user_id, {})[self.item_key] = \
-            data["inventories"][self.user_id].get(self.item_key, 0) + 1
+        server_data.setdefault("inventories", {}).setdefault(self.user_id, {})[self.item_key] = \
+            server_data["inventories"][self.user_id].get(self.item_key, 0) + 1
         
+        save_server_data(data, self.guild_id, server_data)
         await save_data(data)
         
         # Get new balances
-        new_wallet = data.get("coins", {}).get(self.user_id, 0)
-        new_bank = data.get("bank", {}).get(self.user_id, 0)
+        new_wallet = server_data.get("coins", {}).get(self.user_id, 0)
+        new_bank = server_data.get("bank", {}).get(self.user_id, 0)
         
         # Success message
         embed = discord.Embed(
@@ -179,7 +184,7 @@ class PurchaseView(discord.ui.View):
         
         embed.add_field(
             name="📦 Total Owned",
-            value=f"{data['inventories'][self.user_id][self.item_key]}x",
+            value=f"{server_data['inventories'][self.user_id][self.item_key]}x",
             inline=True
         )
         
@@ -201,10 +206,13 @@ class PurchaseView(discord.ui.View):
             return
         
         # Go back to category view
-        view = CategoryView(self.user_id, self.category_name)
+        view = CategoryView(self.user_id, self.guild_id, self.category_name)
         
         data = await load_data()
-        user_coins = data.get("coins", {}).get(self.user_id, 0)
+        from .database import get_server_data
+        server_data = get_server_data(data, self.guild_id)
+        
+        user_coins = server_data.get("coins", {}).get(self.user_id, 0)
         
         embed = discord.Embed(
             title=f"{self.category_name}",
@@ -226,9 +234,10 @@ class PurchaseView(discord.ui.View):
 
 class CategoryView(discord.ui.View):
     """View with item dropdown for a specific category"""
-    def __init__(self, user_id, category_name):
+    def __init__(self, user_id, guild_id, category_name):
         super().__init__(timeout=180)
         self.user_id = user_id
+        self.guild_id = guild_id
         self.category_name = category_name
         
         # Add dropdown with items from this category
@@ -271,11 +280,14 @@ class CategoryView(discord.ui.View):
         item_data = items[item_key]
         
         # Show purchase confirmation
-        view = PurchaseView(self.user_id, item_key, item_data, self.category_name)
+        view = PurchaseView(self.user_id, self.guild_id, item_key, item_data, self.category_name)
         
         data = await load_data()
-        user_wallet = data.get("coins", {}).get(self.user_id, 0)
-        user_bank = data.get("bank", {}).get(self.user_id, 0)
+        from .database import get_server_data
+        server_data = get_server_data(data, self.guild_id)
+        
+        user_wallet = server_data.get("coins", {}).get(self.user_id, 0)
+        user_bank = server_data.get("bank", {}).get(self.user_id, 0)
         user_total = user_wallet + user_bank
         can_afford = user_total >= item_data['price']
         
@@ -344,9 +356,10 @@ class CategoryView(discord.ui.View):
 
 class ShopView(discord.ui.View):
     """Main shop view with category buttons"""
-    def __init__(self, user_id):
+    def __init__(self, user_id, guild_id):
         super().__init__(timeout=180)
         self.user_id = user_id
+        self.guild_id = guild_id
     
     @discord.ui.button(label="🧪 Potions", style=discord.ButtonStyle.primary, row=0)
     async def potions_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -372,7 +385,10 @@ class ShopView(discord.ui.View):
     async def show_category(self, interaction, category_name):
         """Show items in category with dropdown"""
         data = await load_data()
-        user_coins = data.get("coins", {}).get(self.user_id, 0)
+        from .database import get_server_data
+        server_data = get_server_data(data, self.guild_id)
+        
+        user_coins = server_data.get("coins", {}).get(self.user_id, 0)
         
         embed = discord.Embed(
             title=f"{category_name}",
@@ -391,7 +407,7 @@ class ShopView(discord.ui.View):
         
         embed.set_footer(text="💡 Just select from the dropdown - no typing required!")
         
-        view = CategoryView(self.user_id, category_name)
+        view = CategoryView(self.user_id, self.guild_id, category_name)
         await interaction.response.edit_message(embed=embed, view=view)
 
 
@@ -403,8 +419,13 @@ class Shop(commands.Cog):
     async def shop(self, interaction: discord.Interaction):
         """Show the main shop"""
         user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id)
+        
         data = await load_data()
-        user_coins = data.get("coins", {}).get(user_id, 0)
+        from .database import get_server_data
+        server_data = get_server_data(data, guild_id)
+        
+        user_coins = server_data.get("coins", {}).get(user_id, 0)
         
         embed = discord.Embed(
             title="🛒 SORABOT SHOP",
@@ -438,7 +459,7 @@ class Shop(commands.Cog):
         
         embed.set_footer(text="💡 Click a button above to get started!")
         
-        view = ShopView(user_id)
+        view = ShopView(user_id, guild_id)
         await interaction.response.send_message(embed=embed, view=view)
 
 

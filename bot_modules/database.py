@@ -106,3 +106,67 @@ async def load_data():
 async def save_data(data, force=False):
     """Save data using the AGGRESSIVE system with optional FORCE parameter"""
     return await data_manager.save_data(data)
+
+# ==================== PER-SERVER DATA HELPERS ====================
+
+def get_server_data(data, guild_id):
+    """
+    Get data for a specific Discord server (guild).
+    Creates server data structure if it doesn't exist.
+    
+    Args:
+        data: Global data dictionary
+        guild_id: Discord guild (server) ID as string
+    
+    Returns:
+        Server-specific data dictionary
+    """
+    guild_id = str(guild_id)
+    
+    # Initialize servers structure if it doesn't exist
+    if "servers" not in data:
+        data["servers"] = {}
+    
+    # Initialize this server's data if it doesn't exist
+    if guild_id not in data["servers"]:
+        data["servers"][guild_id] = {
+            "coins": {},
+            "bank": {},
+            "last_daily": {},
+            "last_weekly": {},
+            "transactions": {},
+            "inventories": {},
+            "equipped": {},
+            "guilds": {},  # In-game guilds (different from Discord servers)
+            "guild_members": {},
+            "guild_invites": {},
+            "stock_portfolios": {},
+            "debt": {},
+            "casino_stats": {},
+            "cooldowns": {},
+            "heist_cooldowns": {},
+            "saturday_contributions": {},
+            "withdrawal_locks": {},
+            "config": {
+                "daily_amount": 150,
+                "weekly_amount": 1000
+            }
+        }
+    
+    return data["servers"][guild_id]
+
+def save_server_data(data, guild_id, server_data):
+    """
+    Save server-specific data back to global data structure.
+    
+    Args:
+        data: Global data dictionary
+        guild_id: Discord guild (server) ID as string
+        server_data: Server-specific data to save
+    """
+    guild_id = str(guild_id)
+    
+    if "servers" not in data:
+        data["servers"] = {}
+    
+    data["servers"][guild_id] = server_data

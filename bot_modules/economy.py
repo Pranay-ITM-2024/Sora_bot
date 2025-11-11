@@ -266,17 +266,22 @@ class Economy(commands.Cog):
     @app_commands.command(name="balance", description="Check your wallet and bank balance.")
     async def balance(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id)
+        
         data = await load_data()
+        from .database import get_server_data, save_server_data
+        server_data = get_server_data(data, guild_id)
         
         # Auto-deduct debt from balance if they have money
-        debt_paid, debt_message = auto_deduct_debt_from_balance(user_id, data)
+        debt_paid, debt_message = auto_deduct_debt_from_balance(user_id, server_data)
         
         if debt_paid > 0:
+            save_server_data(data, guild_id, server_data)
             await save_data(data)
         
-        coins = data.get("coins", {}).get(user_id, 0)
-        bank = data.get("bank", {}).get(user_id, 0)
-        debt = data.get("debt", {}).get(user_id, 0)
+        coins = server_data.get("coins", {}).get(user_id, 0)
+        bank = server_data.get("bank", {}).get(user_id, 0)
+        debt = server_data.get("debt", {}).get(user_id, 0)
         
         embed = discord.Embed(title=f"{interaction.user.display_name}'s Balance", color=0x00ff99)
         
@@ -298,10 +303,14 @@ class Economy(commands.Cog):
     @app_commands.command(name="daily", description="Claim your daily reward.")
     async def daily(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id)
         now = datetime.utcnow()
-        data = await load_data()
         
-        last_daily = data.get("last_daily", {}).get(user_id)
+        data = await load_data()
+        from .database import get_server_data, save_server_data
+        server_data = get_server_data(data, guild_id)
+        
+        last_daily = server_data.get("last_daily", {}).get(user_id)
         daily_amount = data.get("config", {}).get("daily_amount", 150)
         
         if last_daily:
@@ -323,20 +332,20 @@ class Economy(commands.Cog):
         multiplier = 1.0
         
         # Check equipped items (piggy_bank gives +15%)
-        equipped = data.get("equipment", {}).get(user_id, {})
+        equipped = server_data.get("equipment", {}).get(user_id, {})
         if equipped.get("accessory") == "piggy_bank":
             multiplier += 0.15
             bonuses.append("🐷 Piggy Bank: +15%")
         
         # Check consumable effects (wealth_potion gives +100%)
-        consumable_effects = data.get("consumable_effects", {}).get(user_id, {})
+        consumable_effects = server_data.get("consumable_effects", {}).get(user_id, {})
         if "wealth_potion" in consumable_effects:
             multiplier += 1.0
             bonuses.append("💰 Wealth Potion: +100%")
             # Consume the potion
             consumable_effects.pop("wealth_potion")
             if not consumable_effects:
-                data["consumable_effects"].pop(user_id, None)
+                server_data["consumable_effects"].pop(user_id, None)
         
         # Check xp_boost (+50% all earnings)
         if "xp_boost" in consumable_effects:
@@ -345,19 +354,19 @@ class Economy(commands.Cog):
             # Consume the boost
             consumable_effects.pop("xp_boost")
             if not consumable_effects:
-                data["consumable_effects"].pop(user_id, None)
+                server_data["consumable_effects"].pop(user_id, None)
         
         # Apply multiplier
         final_amount = int(daily_amount * multiplier)
         bonus_amount = final_amount - daily_amount
         
         # Deduct any outstanding debt
-        remaining_amount, debt_paid = deduct_debt(user_id, final_amount, data)
+        remaining_amount, debt_paid = deduct_debt(user_id, final_amount, server_data)
         
         # Update balance
-        coins = data.get("coins", {}).get(user_id, 0) + remaining_amount
-        data.setdefault("coins", {})[user_id] = coins
-        data.setdefault("last_daily", {})[user_id] = now.strftime("%Y-%m-%d")
+        coins = server_data.get("coins", {}).get(user_id, 0) + remaining_amount
+        server_data.setdefault("coins", {})[user_id] = coins
+        server_data.setdefault("last_daily", {})[user_id] = now.strftime("%Y-%m-%d")
         
         # Add transaction
         tx = {
@@ -366,8 +375,9 @@ class Economy(commands.Cog):
             "amount": final_amount, 
             "reason": "Daily claim" + (f" (+{bonus_amount} bonus)" if bonus_amount > 0 else "")
         }
-        data.setdefault("transactions", {}).setdefault(user_id, []).append(tx)
+        server_data.setdefault("transactions", {}).setdefault(user_id, []).append(tx)
         
+        save_server_data(data, guild_id, server_data)
         await save_data(data, force=True)
         
         embed = discord.Embed(title="💰 Daily Reward Claimed!", color=0x00ff99)
@@ -394,10 +404,14 @@ class Economy(commands.Cog):
     @app_commands.command(name="weekly", description="Claim your weekly reward.")
     async def weekly(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id)
         now = datetime.utcnow()
-        data = await load_data()
         
-        last_weekly = data.get("last_weekly", {}).get(user_id)
+        data = await load_data()
+        from .database import get_server_data, save_server_data
+        server_data = get_server_data(data, guild_id)
+        
+        last_weekly = server_data.get("last_weekly", {}).get(user_id)
         weekly_amount = data.get("config", {}).get("weekly_amount", 1000)
         
         if last_weekly:
@@ -419,20 +433,20 @@ class Economy(commands.Cog):
         multiplier = 1.0
         
         # Check equipped items (piggy_bank gives +15%)
-        equipped = data.get("equipment", {}).get(user_id, {})
+        equipped = server_data.get("equipment", {}).get(user_id, {})
         if equipped.get("accessory") == "piggy_bank":
             multiplier += 0.15
             bonuses.append("🐷 Piggy Bank: +15%")
         
         # Check consumable effects (wealth_potion gives +100%)
-        consumable_effects = data.get("consumable_effects", {}).get(user_id, {})
+        consumable_effects = server_data.get("consumable_effects", {}).get(user_id, {})
         if "wealth_potion" in consumable_effects:
             multiplier += 1.0
             bonuses.append("💰 Wealth Potion: +100%")
             # Consume the potion
             consumable_effects.pop("wealth_potion")
             if not consumable_effects:
-                data["consumable_effects"].pop(user_id, None)
+                server_data["consumable_effects"].pop(user_id, None)
         
         # Check xp_boost (+50% all earnings)
         if "xp_boost" in consumable_effects:
@@ -441,19 +455,19 @@ class Economy(commands.Cog):
             # Consume the boost
             consumable_effects.pop("xp_boost")
             if not consumable_effects:
-                data["consumable_effects"].pop(user_id, None)
+                server_data["consumable_effects"].pop(user_id, None)
         
         # Apply multiplier
         final_amount = int(weekly_amount * multiplier)
         bonus_amount = final_amount - weekly_amount
         
         # Deduct any outstanding debt
-        remaining_amount, debt_paid = deduct_debt(user_id, final_amount, data)
+        remaining_amount, debt_paid = deduct_debt(user_id, final_amount, server_data)
         
         # Update balance
-        coins = data.get("coins", {}).get(user_id, 0) + remaining_amount
-        data.setdefault("coins", {})[user_id] = coins
-        data.setdefault("last_weekly", {})[user_id] = now.isoformat()
+        coins = server_data.get("coins", {}).get(user_id, 0) + remaining_amount
+        server_data.setdefault("coins", {})[user_id] = coins
+        server_data.setdefault("last_weekly", {})[user_id] = now.isoformat()
         
         # Add transaction
         tx = {
@@ -462,8 +476,9 @@ class Economy(commands.Cog):
             "amount": final_amount, 
             "reason": "Weekly claim" + (f" (+{bonus_amount} bonus)" if bonus_amount > 0 else "")
         }
-        data.setdefault("transactions", {}).setdefault(user_id, []).append(tx)
+        server_data.setdefault("transactions", {}).setdefault(user_id, []).append(tx)
         
+        save_server_data(data, guild_id, server_data)
         await save_data(data, force=True)
         
         embed = discord.Embed(title="🎁 Weekly Reward Claimed!", color=0x9d4edd)
@@ -483,6 +498,13 @@ class Economy(commands.Cog):
             if remaining_debt > 0:
                 embed.add_field(name="⚠️ Remaining Debt", value=f"{remaining_debt:,} coins", inline=True)
         
+        if debt_paid > 0:
+            embed.add_field(name="💳 Debt Paid", value=f"-{debt_paid:,} coins", inline=True)
+            embed.add_field(name="Added to Wallet", value=f"+{remaining_amount:,} coins", inline=True)
+            remaining_debt = server_data.get("debt", {}).get(user_id, 0)
+            if remaining_debt > 0:
+                embed.add_field(name="⚠️ Remaining Debt", value=f"{remaining_debt:,} coins", inline=True)
+        
         embed.add_field(name="New Balance", value=f"💵 {coins:,} coins", inline=False)
         embed.set_footer(text="💡 Tip: Equip Piggy Bank or use Wealth Potion for bonuses!")
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -490,7 +512,14 @@ class Economy(commands.Cog):
     @app_commands.command(name="bank", description="Access your bank account with deposit/withdraw options.")
     async def bank(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
-        coins, bank = await get_balance(int(user_id))
+        guild_id = str(interaction.guild_id)
+        
+        data = await load_data()
+        from .database import get_server_data
+        server_data = get_server_data(data, guild_id)
+        
+        coins = server_data.get("coins", {}).get(user_id, 0)
+        bank = server_data.get("bank", {}).get(user_id, 0)
         
         embed = discord.Embed(title="🏦 Bank Account", color=0x3498db)
         embed.add_field(name="💰 Wallet", value=f"{coins:,} coins", inline=True)
@@ -499,7 +528,7 @@ class Economy(commands.Cog):
         embed.add_field(name="📈 Interest", value="0.1% per 10 minutes", inline=True)
         embed.set_footer(text="Use the buttons below to deposit or withdraw coins")
         
-        view = BankView(user_id)
+        view = BankView(user_id, guild_id)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
     @app_commands.command(name="pay", description="Send coins to another user.")
@@ -515,26 +544,31 @@ class Economy(commands.Cog):
         
         sender_id = str(interaction.user.id)
         receiver_id = str(user.id)
+        guild_id = str(interaction.guild_id)
         
         data = await load_data()
-        sender_coins = data.get("coins", {}).get(sender_id, 0)
+        from .database import get_server_data, save_server_data
+        server_data = get_server_data(data, guild_id)
+        
+        sender_coins = server_data.get("coins", {}).get(sender_id, 0)
         
         if sender_coins < amount:
             await interaction.response.send_message(f"❌ Insufficient funds! You have {sender_coins:,} coins.", ephemeral=True)
             return
         
         # Transfer coins
-        data.setdefault("coins", {})[sender_id] = sender_coins - amount
-        data.setdefault("coins", {})[receiver_id] = data.get("coins", {}).get(receiver_id, 0) + amount
+        server_data.setdefault("coins", {})[sender_id] = sender_coins - amount
+        server_data.setdefault("coins", {})[receiver_id] = server_data.get("coins", {}).get(receiver_id, 0) + amount
         
         # Add transactions
         now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
         sender_tx = {"time": now, "type": "debit", "amount": amount, "reason": f"Payment to {user.display_name}"}
         receiver_tx = {"time": now, "type": "credit", "amount": amount, "reason": f"Payment from {interaction.user.display_name}"}
         
-        data.setdefault("transactions", {}).setdefault(sender_id, []).append(sender_tx)
-        data.setdefault("transactions", {}).setdefault(receiver_id, []).append(receiver_tx)
+        server_data.setdefault("transactions", {}).setdefault(sender_id, []).append(sender_tx)
+        server_data.setdefault("transactions", {}).setdefault(receiver_id, []).append(receiver_tx)
         
+        save_server_data(data, guild_id, server_data)
         await save_data(data)
         
         embed = discord.Embed(title="💸 Payment Sent", color=0x00ff00)
@@ -566,24 +600,29 @@ class Economy(commands.Cog):
     @app_commands.command(name="profile", description="View your stats, guild, and equipped items.")
     async def profile(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id)
+        
         data = await load_data()
+        from .database import get_server_data, save_server_data
+        server_data = get_server_data(data, guild_id)
         
         # Auto-deduct debt from balance if they have money
-        debt_paid, debt_message = auto_deduct_debt_from_balance(user_id, data)
+        debt_paid, debt_message = auto_deduct_debt_from_balance(user_id, server_data)
         
         if debt_paid > 0:
+            save_server_data(data, guild_id, server_data)
             await save_data(data)
         
-        coins = data.get("coins", {}).get(user_id, 0)
-        bank = data.get("bank", {}).get(user_id, 0)
+        coins = server_data.get("coins", {}).get(user_id, 0)
+        bank = server_data.get("bank", {}).get(user_id, 0)
         total_wealth = coins + bank
         
         # Get transaction count
-        transactions = data.get("transactions", {}).get(user_id, [])
+        transactions = server_data.get("transactions", {}).get(user_id, [])
         transaction_count = len(transactions)
         
         # Get equipped items
-        equipped = data.get("equipped", {}).get(user_id, {})
+        equipped = server_data.get("equipped", {}).get(user_id, {})
         
         # Get guild info (placeholder)
         guild_name = "No Guild"
@@ -627,11 +666,14 @@ class Economy(commands.Cog):
         
         robber_id = str(interaction.user.id)
         target_id = str(user.id)
+        guild_id = str(interaction.guild_id)
         
         data = await load_data()
+        from .database import get_server_data, save_server_data
+        server_data = get_server_data(data, guild_id)
         
         # Check cooldown
-        cooldowns = data.get("cooldowns", {})
+        cooldowns = server_data.get("cooldowns", {})
         rob_cooldowns = cooldowns.get("rob", {})
         last_rob = rob_cooldowns.get(robber_id)
         
@@ -645,7 +687,7 @@ class Economy(commands.Cog):
                 return
         
         # Get target's wallet
-        target_coins = data.get("coins", {}).get(target_id, 0)
+        target_coins = server_data.get("coins", {}).get(target_id, 0)
         
         if target_coins < 100:
             await interaction.response.send_message(f"❌ {user.display_name} doesn't have enough coins to rob (minimum 100)!", ephemeral=True)
@@ -657,7 +699,7 @@ class Economy(commands.Cog):
         fine_percent = data.get("config", {}).get("rob_fine_percent", 0.1)
         
         # Check for equipped items that affect robbery
-        equipped = data.get("equipment", {})
+        equipped = server_data.get("equipment", {})
         robber_equipped = equipped.get(robber_id, {})
         target_equipped = equipped.get(target_id, {})
         
@@ -689,8 +731,8 @@ class Economy(commands.Cog):
             stolen_amount = random.randint(50, max_steal)
             
             # Transfer coins
-            data.setdefault("coins", {})[target_id] = target_coins - stolen_amount
-            data.setdefault("coins", {})[robber_id] = data.get("coins", {}).get(robber_id, 0) + stolen_amount
+            server_data.setdefault("coins", {})[target_id] = target_coins - stolen_amount
+            server_data.setdefault("coins", {})[robber_id] = server_data.get("coins", {}).get(robber_id, 0) + stolen_amount
             
             embed = discord.Embed(title="💰 Robbery Successful!", color=0x00ff00)
             embed.add_field(name="Target", value=user.mention, inline=True)
@@ -704,13 +746,13 @@ class Economy(commands.Cog):
             robber_tx = {"time": now, "type": "credit", "amount": stolen_amount, "reason": f"Robbed {user.display_name}"}
             target_tx = {"time": now, "type": "debit", "amount": stolen_amount, "reason": f"Robbed by {interaction.user.display_name}"}
             
-            data.setdefault("transactions", {}).setdefault(robber_id, []).append(robber_tx)
-            data.setdefault("transactions", {}).setdefault(target_id, []).append(target_tx)
+            server_data.setdefault("transactions", {}).setdefault(robber_id, []).append(robber_tx)
+            server_data.setdefault("transactions", {}).setdefault(target_id, []).append(target_tx)
             
         else:
             # Failed!
-            robber_coins = data.get("coins", {}).get(robber_id, 0)
-            robber_bank = data.get("bank", {}).get(robber_id, 0)
+            robber_coins = server_data.get("coins", {}).get(robber_id, 0)
+            robber_bank = server_data.get("bank", {}).get(robber_id, 0)
             total_robber_money = robber_coins + robber_bank
             
             # Calculate fine (max 10% of target's coins)
@@ -720,18 +762,18 @@ class Economy(commands.Cog):
             if total_robber_money >= fine_amount:
                 if robber_coins >= fine_amount:
                     # Take from wallet only
-                    data.setdefault("coins", {})[robber_id] = robber_coins - fine_amount
+                    server_data.setdefault("coins", {})[robber_id] = robber_coins - fine_amount
                     fine_from_wallet = fine_amount
                     fine_from_bank = 0
                 else:
                     # Take all from wallet, rest from bank
                     fine_from_wallet = robber_coins
                     fine_from_bank = fine_amount - robber_coins
-                    data.setdefault("coins", {})[robber_id] = 0
-                    data.setdefault("bank", {})[robber_id] = robber_bank - fine_from_bank
+                    server_data.setdefault("coins", {})[robber_id] = 0
+                    server_data.setdefault("bank", {})[robber_id] = robber_bank - fine_from_bank
                 
                 # Give fine to target's wallet
-                data.setdefault("coins", {})[target_id] = target_coins + fine_amount
+                server_data.setdefault("coins", {})[target_id] = target_coins + fine_amount
                 
                 embed = discord.Embed(title="🚔 Robbery Failed!", color=0xe74c3c)
                 embed.add_field(name="Target", value=user.mention, inline=True)
@@ -745,15 +787,15 @@ class Economy(commands.Cog):
                 debt_amount = required_fine - paid_amount
                 
                 # Take all their money
-                data.setdefault("coins", {})[robber_id] = 0
-                data.setdefault("bank", {})[robber_id] = 0
+                server_data.setdefault("coins", {})[robber_id] = 0
+                server_data.setdefault("bank", {})[robber_id] = 0
                 
                 # Give what they can pay to target
                 if paid_amount > 0:
-                    data.setdefault("coins", {})[target_id] = target_coins + paid_amount
+                    server_data.setdefault("coins", {})[target_id] = target_coins + paid_amount
                 
                 # Add debt to robber
-                data.setdefault("debt", {})[robber_id] = data.get("debt", {}).get(robber_id, 0) + debt_amount
+                server_data.setdefault("debt", {})[robber_id] = server_data.get("debt", {}).get(robber_id, 0) + debt_amount
                 
                 embed = discord.Embed(title="🚔 Robbery Failed!", color=0xe74c3c)
                 embed.add_field(name="Target", value=user.mention, inline=True)
@@ -772,19 +814,21 @@ class Economy(commands.Cog):
                 robber_tx = {"time": now, "type": "debit", "amount": actual_fine_paid, "reason": f"Failed robbery fine to {user.display_name}"}
                 target_tx = {"time": now, "type": "credit", "amount": actual_fine_paid, "reason": f"Robbery protection from {interaction.user.display_name}"}
                 
-                data.setdefault("transactions", {}).setdefault(robber_id, []).append(robber_tx)
-                data.setdefault("transactions", {}).setdefault(target_id, []).append(target_tx)
+                server_data.setdefault("transactions", {}).setdefault(robber_id, []).append(robber_tx)
+                server_data.setdefault("transactions", {}).setdefault(target_id, []).append(target_tx)
         
         # Set cooldown
-        data.setdefault("cooldowns", {}).setdefault("rob", {})[robber_id] = datetime.utcnow().isoformat()
+        server_data.setdefault("cooldowns", {}).setdefault("rob", {})[robber_id] = datetime.utcnow().isoformat()
         
+        save_server_data(data, guild_id, server_data)
         await save_data(data)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 class BankView(discord.ui.View):
-    def __init__(self, user_id):
+    def __init__(self, user_id, guild_id):
         super().__init__(timeout=300)
         self.user_id = user_id
+        self.guild_id = guild_id
 
     @discord.ui.button(label="Deposit", style=discord.ButtonStyle.green, emoji="📥")
     async def deposit(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -792,7 +836,7 @@ class BankView(discord.ui.View):
             await interaction.response.send_message("❌ This is not your bank account!", ephemeral=True)
             return
         
-        modal = BankModal("deposit", self.user_id)
+        modal = BankModal("deposit", self.user_id, self.guild_id)
         await interaction.response.send_modal(modal)
 
     @discord.ui.button(label="Withdraw", style=discord.ButtonStyle.red, emoji="📤")
@@ -801,14 +845,15 @@ class BankView(discord.ui.View):
             await interaction.response.send_message("❌ This is not your bank account!", ephemeral=True)
             return
         
-        modal = BankModal("withdraw", self.user_id)
+        modal = BankModal("withdraw", self.user_id, self.guild_id)
         await interaction.response.send_modal(modal)
 
 class BankModal(discord.ui.Modal):
-    def __init__(self, action, user_id):
+    def __init__(self, action, user_id, guild_id):
         super().__init__(title=f"{action.title()} Coins")
         self.action = action
         self.user_id = user_id
+        self.guild_id = guild_id
         
         self.amount = discord.ui.TextInput(
             label=f"Amount to {action}",
@@ -829,8 +874,11 @@ class BankModal(discord.ui.Modal):
             return
         
         data = await load_data()
-        coins = data.get("coins", {}).get(self.user_id, 0)
-        bank = data.get("bank", {}).get(self.user_id, 0)
+        from .database import get_server_data, save_server_data
+        server_data = get_server_data(data, self.guild_id)
+        
+        coins = server_data.get("coins", {}).get(self.user_id, 0)
+        bank = server_data.get("bank", {}).get(self.user_id, 0)
         
         if self.action == "deposit":
             if coins < amount:
@@ -859,14 +907,15 @@ class BankModal(discord.ui.Modal):
             embed.add_field(name="New Bank", value=f"{new_bank:,} coins", inline=True)
         
         # Update data
-        data.setdefault("coins", {})[self.user_id] = new_coins
-        data.setdefault("bank", {})[self.user_id] = new_bank
+        server_data.setdefault("coins", {})[self.user_id] = new_coins
+        server_data.setdefault("bank", {})[self.user_id] = new_bank
         
         # Add transaction
         now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
         tx = {"time": now, "type": "transfer", "amount": amount, "reason": f"Bank {self.action}"}
-        data.setdefault("transactions", {}).setdefault(self.user_id, []).append(tx)
+        server_data.setdefault("transactions", {}).setdefault(self.user_id, []).append(tx)
         
+        save_server_data(data, self.guild_id, server_data)
         await save_data(data)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
