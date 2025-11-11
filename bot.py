@@ -289,24 +289,48 @@ async def market_update_task():
 
 @tasks.loop(minutes=10)
 async def interest_task():
-    """Calculate interest on bank accounts"""
+    """Calculate interest on bank accounts with bonus for top guild"""
     try:
         data = await data_manager.load_data()
         bank_accounts = data.get("bank", {})
         config = data.get("config", {})
         interest_rate = config.get("interest_rate", 0.001)
         
+        # Find the top guild by total bank balance
+        guilds = data.get("guilds", {})
+        guild_members = data.get("guild_members", {})
+        top_guild = None
+        top_guild_balance = 0
+        top_guild_members = set()
+        
+        for guild_name, guild_data in guilds.items():
+            guild_bank = guild_data.get("bank", 0)
+            if guild_bank > top_guild_balance:
+                top_guild_balance = guild_bank
+                top_guild = guild_name
+                top_guild_members = set(guild_members.get(guild_name, []))
+        
+        # Calculate interest for each user
         for user_id, balance in bank_accounts.items():
             if balance > 0:
+                # Base interest
                 interest = int(balance * interest_rate)
+                
+                # Add 5% bonus if user is in top guild
+                if user_id in top_guild_members:
+                    bonus = int(balance * 0.05)  # 5% bonus
+                    interest += bonus
+                
                 if interest > 0:
                     bank_accounts[user_id] = balance + interest
         
         data["bank"] = bank_accounts
         data["_meta"]["last_interest_ts"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        if top_guild:
+            data["_meta"]["last_top_guild"] = top_guild
         
         await data_manager.save_data(data)
-        logging.debug("💰 Interest calculated")
+        logging.debug(f"💰 Interest calculated (Top guild: {top_guild or 'None'})")
         
     except Exception as e:
         logging.error(f"Interest calculation failed: {e}")

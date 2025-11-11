@@ -274,8 +274,10 @@ class CategoryView(discord.ui.View):
         view = PurchaseView(self.user_id, item_key, item_data, self.category_name)
         
         data = await load_data()
-        user_coins = data.get("coins", {}).get(self.user_id, 0)
-        can_afford = user_coins >= item_data['price']
+        user_wallet = data.get("coins", {}).get(self.user_id, 0)
+        user_bank = data.get("bank", {}).get(self.user_id, 0)
+        user_total = user_wallet + user_bank
+        can_afford = user_total >= item_data['price']
         
         embed = discord.Embed(
             title="🛒 Confirm Purchase",
@@ -284,13 +286,13 @@ class CategoryView(discord.ui.View):
         )
         
         embed.add_field(name="💰 Price", value=f"{item_data['price']:,} coins", inline=True)
-        embed.add_field(name="💼 Your Balance", value=f"{user_coins:,} coins", inline=True)
+        embed.add_field(name="💼 Your Balance", value=f"💰 {user_wallet:,} | 🏦 {user_bank:,}\nTotal: {user_total:,}", inline=True)
         
         if can_afford:
-            embed.add_field(name="📊 After Purchase", value=f"{user_coins - item_data['price']:,} coins", inline=True)
-            embed.set_footer(text="✅ Click 'Buy Now' to confirm your purchase")
+            embed.add_field(name="📊 Payment", value="Will use wallet + bank if needed", inline=True)
+            embed.set_footer(text="✅ Click 'Buy Now' to confirm (uses wallet first, then bank)")
         else:
-            embed.add_field(name="❌ Short By", value=f"{item_data['price'] - user_coins:,} coins", inline=True)
+            embed.add_field(name="❌ Short By", value=f"{item_data['price'] - user_total:,} coins", inline=True)
             embed.set_footer(text="❌ Not enough coins! Earn more with /daily, /weekly, or casino games")
         
         await interaction.response.edit_message(embed=embed, view=view)

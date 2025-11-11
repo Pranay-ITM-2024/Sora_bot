@@ -260,22 +260,26 @@ class SlotsView(discord.ui.View):
         
         # Send public announcement for jackpots
         if is_jackpot:
-            multipliers = {"🍒": 3, "🍋": 4, "🍊": 5, "🍇": 8, "⭐": 15, "💎": 50}
-            multiplier = multipliers.get(reel1, 3)
-            
-            announcement = discord.Embed(
-                title="🎰💰 JACKPOT ALERT! 💰🎰",
-                description=f"**{interaction.user.mention}** just hit a JACKPOT!",
-                color=0xFFD700  # Gold color
-            )
-            announcement.add_field(name="Winning Combo", value=f"[ {reel1} | {reel2} | {reel3} ]", inline=False)
-            announcement.add_field(name="Bet Amount", value=f"{bet:,} coins", inline=True)
-            announcement.add_field(name="Multiplier", value=f"x{multiplier}", inline=True)
-            announcement.add_field(name="Total Winnings", value=f"🎉 **{winnings:,} coins!** 🎉", inline=True)
-            announcement.set_thumbnail(url=interaction.user.display_avatar.url)
-            announcement.set_footer(text="🎰 Try your luck with /slots!")
-            
-            await interaction.channel.send(embed=announcement)
+            try:
+                multipliers = {"🍒": 3, "🍋": 4, "🍊": 5, "🍇": 8, "⭐": 15, "💎": 50}
+                multiplier = multipliers.get(reel1, 3)
+                
+                announcement = discord.Embed(
+                    title="🎰💰 JACKPOT ALERT! 💰🎰",
+                    description=f"**{interaction.user.mention}** just hit a JACKPOT!",
+                    color=0xFFD700  # Gold color
+                )
+                announcement.add_field(name="Winning Combo", value=f"[ {reel1} | {reel2} | {reel3} ]", inline=False)
+                announcement.add_field(name="Bet Amount", value=f"{bet:,} coins", inline=True)
+                announcement.add_field(name="Multiplier", value=f"x{multiplier}", inline=True)
+                announcement.add_field(name="Total Winnings", value=f"🎉 **{winnings:,} coins!** 🎉", inline=True)
+                announcement.set_thumbnail(url=interaction.user.display_avatar.url)
+                announcement.set_footer(text="🎰 Try your luck with /slots!")
+                
+                # Use followup to send public message after editing the original
+                await interaction.followup.send(embed=announcement)
+            except Exception as e:
+                print(f"Failed to send jackpot announcement: {e}")
 
 # ============================================
 # RAT RACE SYSTEM - Multiplayer Live Racing

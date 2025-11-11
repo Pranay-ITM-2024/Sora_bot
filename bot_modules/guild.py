@@ -226,7 +226,7 @@ class GuildBankView(discord.ui.View):
         embed.add_field(name="👥 Members", value=str(len(members)), inline=True)
         embed.add_field(name="💰 Bank Balance", value=f"{guild_info.get('bank', 0):,} coins", inline=True)
         embed.add_field(name="📅 Created", value=guild_info.get('created', 'Unknown')[:10] if guild_info.get('created') else 'Unknown', inline=True)
-        embed.add_field(name="📈 Guild Benefits", value="• +5% bank interest\n• Shared treasury\n• Member collaboration", inline=False)
+        embed.add_field(name="📈 Guild Benefits", value="• +5% bank interest\n• TOP GUILD BONUS: Extra +5% interest!\n• Shared treasury\n• Member collaboration", inline=False)
         
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -556,7 +556,7 @@ class Guild(commands.Cog):
         embed.add_field(name="👑 Owner", value=f"<@{guild_info.get('owner', 'Unknown')}>", inline=True)
         
         # Add interest bonus info
-        embed.add_field(name="📈 Guild Benefits", value="• +5% bank interest\n• Shared guild treasury\n• Member collaboration\n• Use buttons below to manage funds", inline=False)
+        embed.add_field(name="📈 Guild Benefits", value="• +5% bank interest\n• 🏆 TOP GUILD BONUS: Extra +5% interest (10% total)!\n• Shared guild treasury\n• Member collaboration\n• Use buttons below to manage funds", inline=False)
 
         view = GuildBankView(user_guild, interaction.user.id)
         await interaction.response.send_message(embed=embed, view=view)
@@ -662,7 +662,7 @@ class Guild(commands.Cog):
         embed.add_field(name="💰 Bank Balance", value=f"{guild_info.get('bank', 0):,} coins", inline=True)
         embed.add_field(name="📅 Created", value=guild_info.get('created', 'Unknown')[:10] if guild_info.get('created') else 'Unknown', inline=True)
         embed.add_field(name="🎯 Your Role", value=get_guild_role(user_id, user_guild, data) or "Member", inline=True)
-        embed.add_field(name="📈 Guild Benefits", value="• +5% bank interest for all members\n• Shared treasury for cooperation\n• Member networking and collaboration\n• Leaderboard recognition", inline=False)
+        embed.add_field(name="📈 Guild Benefits", value="• +5% bank interest for all members\n• 🏆 TOP GUILD BONUS: Extra +5% interest (10% total)!\n• Shared treasury for cooperation\n• Member networking and collaboration\n• Leaderboard recognition", inline=False)
 
         await interaction.response.send_message(embed=embed)
 
@@ -716,7 +716,7 @@ class Guild(commands.Cog):
         embed.add_field(name="💰 Bank", value=f"{guild_bank:,} coins", inline=True)
         embed.add_field(
             name="🎁 Guild Benefits",
-            value="• Shared guild bank\n• +5% bank interest\n• Guild leaderboard ranking\n• Cooperative gameplay",
+            value="• Shared guild bank\n• +5% bank interest\n• 🏆 TOP GUILD: Extra +5% interest bonus!\n• Guild leaderboard ranking\n• Cooperative gameplay",
             inline=False
         )
         embed.set_footer(text="Accept or decline the invitation below")
@@ -756,7 +756,7 @@ class GuildInviteView(discord.ui.View):
         )
         embed.add_field(
             name="🎉 Welcome!",
-            value="You can now:\n• Deposit to `/guild_bank`\n• View `/guild_members`\n• Check `/guild_info`\n• Earn +5% bank interest",
+            value="You can now:\n• Deposit to `/guild_bank`\n• View `/guild_members`\n• Check `/guild_info`\n• Earn +5% bank interest\n• 🏆 Compete for TOP GUILD bonus (+5% more!)",
             inline=False
         )
         

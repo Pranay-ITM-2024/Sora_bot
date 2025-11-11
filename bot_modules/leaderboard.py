@@ -330,13 +330,9 @@ class LeaderboardView(discord.ui.View):
             
             # Calculate bonuses
             bonuses = []
-            if i <= 3:  # Top 3 guilds get bonuses
-                if i == 1:
-                    bonuses = ["10% shop discount", "+0.2% interest", "15% rob protection"]
-                elif i == 2:
-                    bonuses = ["5% shop discount", "+0.1% interest", "10% rob protection"]
-                elif i == 3:
-                    bonuses = ["3% shop discount", "+0.05% interest", "5% rob protection"]
+            if i == 1:
+                # Top guild gets the special interest bonus
+                bonuses = ["🏆 +5% Bank Interest Bonus (10% total!)"]
             
             bonus_text = f"\n    🎉 {', '.join(bonuses)}" if bonuses else ""
             
@@ -347,7 +343,7 @@ class LeaderboardView(discord.ui.View):
         else:
             embed.add_field(name="🏆 Leaderboard", value="No guilds found!", inline=False)
         
-        embed.set_footer(text="🎉 Top 3 guilds get special bonuses!")
+        embed.set_footer(text="� #1 Guild gets +5% extra bank interest bonus for all members!")
         
         await interaction.response.edit_message(embed=embed, view=self)
 
