@@ -205,25 +205,28 @@ class LeaderboardView(discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=self)
 
     async def show_casino_leaderboard(self, interaction, data):
-        # Analyze transaction history for casino performance
-        casino_stats = {}
+        # Use new casino_stats tracking system
+        casino_stats_data = data.get("casino_stats", {})
         
-        for user_id, transactions in data.get("transactions", {}).items():
-            wins = sum(1 for tx in transactions if tx["type"] == "credit" and any(game in tx["reason"].lower() for game in ["slots", "coinflip", "blackjack", "ratrace"]))
+        player_stats = {}
+        for user_id, stats in casino_stats_data.items():
+            total_games = stats.get("total_games", 0)
+            wins = stats.get("wins", 0)
+            losses = stats.get("losses", 0)
             
-            if wins > 0:
-                losses = sum(1 for tx in transactions if tx["type"] == "debit" and any(game in tx["reason"].lower() for game in ["slots", "coinflip", "blackjack", "ratrace"]))
-                total_games = wins + losses
-                win_rate = (wins / total_games) * 100 if total_games > 0 else 0
-                
-                casino_stats[user_id] = {
+            if total_games > 0:
+                win_rate = (wins / total_games) * 100
+                player_stats[user_id] = {
                     "wins": wins,
+                    "losses": losses,
                     "total_games": total_games,
-                    "win_rate": win_rate
+                    "win_rate": win_rate,
+                    "total_bet": stats.get("total_bet", 0),
+                    "total_won": stats.get("total_won", 0)
                 }
         
-        # Sort by wins, then by win rate
-        sorted_players = sorted(casino_stats.items(), key=lambda x: (x[1]["wins"], x[1]["win_rate"]), reverse=True)
+        # Sort by total games played, then by wins
+        sorted_players = sorted(player_stats.items(), key=lambda x: (x[1]["total_games"], x[1]["wins"]), reverse=True)
         
         embed = discord.Embed(title="🎰 Casino Champions", description="Top performers at casino games", color=0xe91e63)
         
@@ -237,7 +240,17 @@ class LeaderboardView(discord.ui.View):
             
             medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"#{i}"
             
-            leaderboard_text.append(f"{medal} **{username}**\n    🎯 {stats['wins']} wins • 📊 {stats['win_rate']:.1f}% win rate • 🎲 {stats['total_games']} games")
+            # Calculate profit/loss
+            net_profit = stats['total_won'] - stats['total_bet']
+            profit_sign = "+" if net_profit >= 0 else ""
+            
+            leaderboard_text.append(
+                f"{medal} **{username}**\n"
+                f"    � {stats['total_games']} games • "
+                f"✅ {stats['wins']}W / ❌ {stats['losses']}L • "
+                f"📊 {stats['win_rate']:.1f}% win rate\n"
+                f"    💰 Net: {profit_sign}{net_profit:,} coins"
+            )
         
         if leaderboard_text:
             embed.add_field(name="🏆 Top Gamblers", value="\n\n".join(leaderboard_text), inline=False)

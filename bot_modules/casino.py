@@ -74,6 +74,46 @@ def set_cooldown(user_id, command, data):
     """Set cooldown for user command"""
     data.setdefault("cooldowns", {}).setdefault(str(user_id), {})[command] = datetime.utcnow().isoformat()
 
+def track_casino_game(user_id, game_name, won, bet_amount, winnings, data):
+    """Track casino game statistics for leaderboards"""
+    user_id = str(user_id)
+    stats = data.setdefault("casino_stats", {}).setdefault(user_id, {
+        "total_games": 0,
+        "wins": 0,
+        "losses": 0,
+        "total_bet": 0,
+        "total_won": 0,
+        "games": {}
+    })
+    
+    # Update overall stats
+    stats["total_games"] += 1
+    stats["total_bet"] += bet_amount
+    stats["total_won"] += winnings
+    
+    if won:
+        stats["wins"] += 1
+    else:
+        stats["losses"] += 1
+    
+    # Update per-game stats
+    game_stats = stats["games"].setdefault(game_name, {
+        "played": 0,
+        "wins": 0,
+        "losses": 0,
+        "total_bet": 0,
+        "total_won": 0
+    })
+    
+    game_stats["played"] += 1
+    game_stats["total_bet"] += bet_amount
+    game_stats["total_won"] += winnings
+    
+    if won:
+        game_stats["wins"] += 1
+    else:
+        game_stats["losses"] += 1
+
 async def get_gambling_effects(user_id, data):
     """Calculate gambling bonuses from items"""
     user_id = str(user_id)
@@ -234,6 +274,9 @@ class SlotsView(discord.ui.View):
             current_wallet = data.get("coins", {}).get(user_id, 0)
             data.setdefault("coins", {})[user_id] = current_wallet + winnings
             add_transaction(user_id, winnings, f"Slots win", data, "credit")
+        
+        # Track casino stats (win or loss)
+        track_casino_game(user_id, "slots", winnings > 0, bet, winnings, data)
         
         await save_data(data, force=True)
         
@@ -854,6 +897,10 @@ class BlackjackView(discord.ui.View):
             await consume_item_effect(user_id, "lucky_potion", data)
             await consume_item_effect(user_id, "mega_lucky_potion", data)
         
+        # Track casino stats
+        won = winnings > 0
+        track_casino_game(user_id, "blackjack", won, self.bet, winnings, data)
+        
         await save_data(data, force=True)
         
         # Get new balance for display
@@ -954,6 +1001,9 @@ class Casino(commands.Cog):
             # Consume luck potions on win
             if effects["payout_bonus"] > 0:
                 await consume_item_effect(user_id, "luck_potion", data)
+        
+        # Track casino stats
+        track_casino_game(user_id, "roulette", won, bet, winnings, data)
         
         # Save data
         await save_data(data, force=True)
@@ -1093,6 +1143,9 @@ class Casino(commands.Cog):
         if won and effects["win_chance_bonus"] > 0:
             await consume_item_effect(user_id, "lucky_potion", data)
             await consume_item_effect(user_id, "mega_lucky_potion", data)
+        
+        # Track casino stats
+        track_casino_game(user_id, "coinflip", won, bet, winnings, data)
         
         set_cooldown(user_id, "coinflip", data)
         await save_data(data, force=True)
