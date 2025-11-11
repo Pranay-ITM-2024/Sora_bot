@@ -1037,25 +1037,30 @@ class Casino(commands.Cog):
     @app_commands.describe(bet="Amount to bet (default: 10)")
     async def slots(self, interaction: discord.Interaction, bet: int = 10):
         user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id)
         
         if bet < 1:
             await interaction.response.send_message("❌ Minimum bet is 1 coin!", ephemeral=True)
             return
         
         data = await load_data()
+        from .database import get_server_data
+        server_data = get_server_data(data, guild_id)
         
         # Check cooldown
-        cooldown = check_cooldown(user_id, "slots", data, 10)
+        cooldown = check_cooldown(user_id, "slots", server_data, 10)
         if cooldown > 0:
             await interaction.response.send_message(f"⏰ Cooldown active! Wait {cooldown} seconds.", ephemeral=True)
             return
         
-        user_coins = data.get("coins", {}).get(user_id, 0)
+        user_coins = server_data.get("coins", {}).get(user_id, 0)
         if user_coins < bet:
             await interaction.response.send_message(f"❌ You need {bet} coins! Your balance: {user_coins}", ephemeral=True)
             return
         
-        set_cooldown(user_id, "slots", data)
+        set_cooldown(user_id, "slots", server_data)
+        from .database import save_server_data
+        save_server_data(data, guild_id, server_data)
         await save_data(data)
         
         embed = discord.Embed(title="🎰 Slot Machine", description="Choose your bet amount:", color=0xf1c40f)
@@ -1063,7 +1068,7 @@ class Casino(commands.Cog):
         embed.add_field(name="Current Bet", value=f"{bet} coins", inline=True)
         
         # Show active effects
-        effects = await get_gambling_effects(user_id, data)
+        effects = await get_gambling_effects(user_id, server_data)
         if effects["win_chance_bonus"] > 0:
             embed.add_field(name="🍀 Luck Bonus", value=f"+{effects['win_chance_bonus']*100:.0f}%", inline=True)
         if effects["payout_bonus"] > 0:
@@ -1073,7 +1078,7 @@ class Casino(commands.Cog):
         
         embed.set_footer(text="🎲 Payouts: 💎x50, ⭐x15, 🍇x8, 🍊x5, 🍋x4, 🍒x3")
         
-        view = SlotsView(user_id)
+        view = SlotsView(user_id, guild_id)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
     @app_commands.command(name="coinflip", description="Flip a coin and double your money!")
@@ -1084,21 +1089,24 @@ class Casino(commands.Cog):
     ])
     async def coinflip(self, interaction: discord.Interaction, bet: int, choice: str):
         user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id)
         
         if bet < 1:
             await interaction.response.send_message("❌ Minimum bet is 1 coin!", ephemeral=True)
             return
         
         data = await load_data()
+        from .database import get_server_data, save_server_data
+        server_data = get_server_data(data, guild_id)
         
         # Check cooldown
-        cooldown = check_cooldown(user_id, "coinflip", data, 15)
+        cooldown = check_cooldown(user_id, "coinflip", server_data, 15)
         if cooldown > 0:
             await interaction.response.send_message(f"⏰ Cooldown active! Wait {cooldown} seconds.", ephemeral=True)
             return
         
         # Check total balance (wallet + bank)
-        wallet, bank, total = get_total_balance(user_id, data)
+        wallet, bank, total = get_total_balance(user_id, server_data)
         if total < bet:
             await interaction.response.send_message(
                 f"❌ Insufficient funds!\n💰 Wallet: {wallet:,} | 🏦 Bank: {bank:,}\n**Need:** {bet:,} coins",
@@ -1107,10 +1115,10 @@ class Casino(commands.Cog):
             return
         
         # Deduct bet from wallet/bank
-        deduct_bet(user_id, bet, data)
+        deduct_bet(user_id, bet, server_data)
         
         # Get effects and calculate win chance
-        effects = await get_gambling_effects(user_id, data)
+        effects = await get_gambling_effects(user_id, server_data)
         base_chance = 0.5
         win_chance = min(0.95, base_chance + effects["win_chance_bonus"])  # Cap at 95%
         
@@ -1122,11 +1130,11 @@ class Casino(commands.Cog):
         if won:
             winnings = bet * 2
             # Add winnings to wallet
-            current_wallet = data.get("coins", {}).get(user_id, 0)
-            data.setdefault("coins", {})[user_id] = current_wallet + winnings
+            current_wallet = server_data.get("coins", {}).get(user_id, 0)
+            server_data.setdefault("coins", {})[user_id] = current_wallet + winnings
             result_text = f"🎉 You won! The coin landed on {result}!"
             color = 0x27ae60
-            add_transaction(user_id, winnings, "Coinflip win", data, "credit")
+            add_transaction(user_id, winnings, "Coinflip win", server_data, "credit")
         else:
             result_text = f"😔 You lost! The coin landed on {result}."
             color = 0xe74c3c
@@ -1134,24 +1142,25 @@ class Casino(commands.Cog):
             # Apply insurance (refund to wallet)
             if effects["insurance"]:
                 refund = bet // 2
-                current_wallet = data.get("coins", {}).get(user_id, 0)
-                data.setdefault("coins", {})[user_id] = current_wallet + refund
+                current_wallet = server_data.get("coins", {}).get(user_id, 0)
+                server_data.setdefault("coins", {})[user_id] = current_wallet + refund
                 result_text += f"\n🛡️ Insurance activated! Refunded {refund} coins"
-                await consume_item_effect(user_id, "insurance_scroll", data)
+                await consume_item_effect(user_id, "insurance_scroll", server_data)
         
         # Consume luck effects
         if won and effects["win_chance_bonus"] > 0:
-            await consume_item_effect(user_id, "lucky_potion", data)
-            await consume_item_effect(user_id, "mega_lucky_potion", data)
+            await consume_item_effect(user_id, "lucky_potion", server_data)
+            await consume_item_effect(user_id, "mega_lucky_potion", server_data)
         
         # Track casino stats
-        track_casino_game(user_id, "coinflip", won, bet, winnings, data)
+        track_casino_game(user_id, "coinflip", won, bet, winnings, server_data)
         
-        set_cooldown(user_id, "coinflip", data)
+        set_cooldown(user_id, "coinflip", server_data)
+        save_server_data(data, guild_id, server_data)
         await save_data(data, force=True)
         
         # Show result
-        new_wallet, new_bank, new_total = get_total_balance(user_id, data)
+        new_wallet, new_bank, new_total = get_total_balance(user_id, server_data)
         net_result = winnings - bet
         
         coin_emoji = "🪙" if result == "heads" else "🔄"
