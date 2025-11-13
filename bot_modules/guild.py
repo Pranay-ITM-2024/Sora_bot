@@ -801,6 +801,231 @@ class GuildInviteView(discord.ui.View):
         
         await interaction.response.edit_message(embed=embed, view=self)
 
+    @app_commands.command(name="guild_transfer", description="Transfer guild ownership to another member")
+    async def guild_transfer(self, interaction: discord.Interaction):
+        user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id)
+        
+        data = await load_data()
+        server_data = get_server_data(data, guild_id)
+        
+        # Find user's guild
+        user_guild = get_user_guild(user_id, server_data)
+        if not user_guild:
+            await interaction.response.send_message("❌ You're not in any guild!", ephemeral=True)
+            return
+        
+        # Check if user is the owner
+        guild_info = server_data.get("guilds", {}).get(user_guild, {})
+        if guild_info.get("owner") != user_id:
+            await interaction.response.send_message("❌ Only the guild owner can transfer ownership!", ephemeral=True)
+            return
+        
+        # Get guild members (excluding the owner)
+        members = server_data.get("guild_members", {}).get(user_guild, [])
+        eligible_members = [m for m in members if m != user_id]
+        
+        if not eligible_members:
+            await interaction.response.send_message("❌ Your guild has no other members to transfer ownership to!", ephemeral=True)
+            return
+        
+        # Create view with member dropdown
+        view = GuildTransferView(user_id, user_guild, eligible_members, guild_id, self.bot)
+        
+        embed = discord.Embed(
+            title="👑 Transfer Guild Ownership",
+            description=f"Select a member to transfer ownership of **{user_guild}** to.\n\n⚠️ **Warning:** This action cannot be undone!",
+            color=0xff9900
+        )
+        embed.add_field(
+            name="📋 Current Owner",
+            value=interaction.user.mention,
+            inline=True
+        )
+        embed.add_field(
+            name="👥 Eligible Members",
+            value=f"{len(eligible_members)} member(s)",
+            inline=True
+        )
+        embed.set_footer(text="Select a member from the dropdown below")
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+class GuildTransferView(discord.ui.View):
+    """View for transferring guild ownership"""
+    def __init__(self, owner_id, guild_name, eligible_members, discord_guild_id, bot):
+        super().__init__(timeout=180)
+        self.owner_id = owner_id
+        self.guild_name = guild_name
+        self.eligible_members = eligible_members
+        self.discord_guild_id = str(discord_guild_id)
+        self.bot = bot
+        self.selected_member = None
+        
+        # Add dropdown with members
+        self.add_member_select()
+    
+    def add_member_select(self):
+        """Add dropdown with eligible members"""
+        # Note: We'll fetch names dynamically, so for now use placeholders
+        select = GuildTransferSelect(self.eligible_members[:25], self.bot, self.owner_id, self.guild_name, self.discord_guild_id)
+        self.add_item(select)
+
+class GuildTransferSelect(discord.ui.Select):
+    """Custom select for guild transfer with async member fetching"""
+    def __init__(self, eligible_members, bot, owner_id, guild_name, discord_guild_id):
+        self.bot = bot
+        self.owner_id = owner_id
+        self.guild_name = guild_name
+        self.discord_guild_id = discord_guild_id
+        
+        # Build options
+        options = []
+        for member_id in eligible_members[:25]:  # Discord limit
+            options.append(
+                discord.SelectOption(
+                    label=f"ID: {member_id[:12]}...",
+                    value=member_id,
+                    description="Transfer ownership to this member",
+                    emoji="👤"
+                )
+            )
+        
+        super().__init__(
+            placeholder="👥 Select a member to transfer ownership...",
+            options=options,
+            custom_id="member_select"
+        )
+    
+    async def callback(self, interaction: discord.Interaction):
+        """Handle member selection"""
+        if str(interaction.user.id) != self.owner_id:
+            await interaction.response.send_message("❌ Only the guild owner can transfer ownership!", ephemeral=True)
+            return
+        
+        selected_id = self.values[0]
+        
+        # Fetch member name
+        try:
+            member = await self.bot.fetch_user(int(selected_id))
+            member_name = member.display_name if member else f"User {selected_id}"
+        except:
+            member_name = f"User {selected_id}"
+        
+        # Show confirmation
+        confirm_view = GuildTransferConfirmView(
+            self.owner_id,
+            self.guild_name,
+            selected_id,
+            member_name,
+            self.discord_guild_id
+        )
+        
+        embed = discord.Embed(
+            title="⚠️ Confirm Ownership Transfer",
+            description=f"Are you sure you want to transfer ownership of **{self.guild_name}** to **{member_name}**?",
+            color=0xff0000
+        )
+        embed.add_field(
+            name="📋 Current Owner",
+            value=interaction.user.mention,
+            inline=True
+        )
+        embed.add_field(
+            name="📋 New Owner",
+            value=f"<@{selected_id}>",
+            inline=True
+        )
+        embed.add_field(
+            name="⚠️ Warning",
+            value="This action **CANNOT** be undone! You will become a regular member.",
+            inline=False
+        )
+        
+        await interaction.response.edit_message(embed=embed, view=confirm_view)
+
+class GuildTransferConfirmView(discord.ui.View):
+    """Confirmation view for guild transfer"""
+    def __init__(self, owner_id, guild_name, new_owner_id, new_owner_name, discord_guild_id):
+        super().__init__(timeout=60)
+        self.owner_id = owner_id
+        self.guild_name = guild_name
+        self.new_owner_id = new_owner_id
+        self.new_owner_name = new_owner_name
+        self.discord_guild_id = str(discord_guild_id)
+    
+    @discord.ui.button(label="✅ Confirm Transfer", style=discord.ButtonStyle.danger)
+    async def confirm_transfer(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if str(interaction.user.id) != self.owner_id:
+            await interaction.response.send_message("❌ Only the current owner can confirm this!", ephemeral=True)
+            return
+        
+        data = await load_data()
+        server_data = get_server_data(data, self.discord_guild_id)
+        
+        # Verify guild still exists and user is still owner
+        guild_info = server_data.get("guilds", {}).get(self.guild_name, {})
+        if guild_info.get("owner") != self.owner_id:
+            await interaction.response.send_message("❌ You are no longer the owner of this guild!", ephemeral=True)
+            return
+        
+        # Verify new owner is still a member
+        members = server_data.get("guild_members", {}).get(self.guild_name, [])
+        if self.new_owner_id not in members:
+            await interaction.response.send_message("❌ The selected member is no longer in the guild!", ephemeral=True)
+            return
+        
+        # Transfer ownership
+        server_data.setdefault("guilds", {})[self.guild_name]["owner"] = self.new_owner_id
+        save_server_data(data, self.discord_guild_id, server_data)
+        await save_data(data, force=True)
+        
+        # Success message
+        embed = discord.Embed(
+            title="✅ Ownership Transferred!",
+            description=f"**{self.guild_name}** now belongs to **{self.new_owner_name}**!",
+            color=0x00ff00
+        )
+        embed.add_field(
+            name="👑 New Owner",
+            value=f"<@{self.new_owner_id}>",
+            inline=True
+        )
+        embed.add_field(
+            name="👤 Previous Owner",
+            value=f"<@{self.owner_id}>",
+            inline=True
+        )
+        embed.add_field(
+            name="🎉 Congratulations!",
+            value=f"<@{self.new_owner_id}> is now the guild owner and has full control over the guild.",
+            inline=False
+        )
+        
+        # Disable buttons
+        for item in self.children:
+            item.disabled = True
+        
+        await interaction.response.edit_message(embed=embed, view=self)
+    
+    @discord.ui.button(label="❌ Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel_transfer(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if str(interaction.user.id) != self.owner_id:
+            await interaction.response.send_message("❌ Only the current owner can cancel this!", ephemeral=True)
+            return
+        
+        embed = discord.Embed(
+            title="❌ Transfer Cancelled",
+            description="Guild ownership transfer has been cancelled.",
+            color=0x808080
+        )
+        
+        # Disable buttons
+        for item in self.children:
+            item.disabled = True
+        
+        await interaction.response.edit_message(embed=embed, view=self)
+
 def get_guild_owner_name(guild_name, data, bot):
     """Get guild owner's display name"""
     guild_info = data.get("guilds", {}).get(guild_name, {})

@@ -361,7 +361,8 @@ class SlotsView(discord.ui.View):
                 announcement.set_thumbnail(url=interaction.user.display_avatar.url)
                 announcement.set_footer(text="🎰 94.8% RTP • Mathematically balanced")
                 
-                await interaction.followup.send(embed=announcement)
+                # Send message and auto-delete after 5 minutes
+                await interaction.followup.send(embed=announcement, delete_after=300)
             except Exception as e:
                 print(f"Failed to send jackpot announcement: {e}")
 
@@ -1144,9 +1145,15 @@ class Casino(commands.Cog):
             await interaction.response.send_message(f"⏰ Cooldown active! Wait {cooldown} seconds.", ephemeral=True)
             return
         
-        user_coins = server_data.get("coins", {}).get(user_id, 0)
-        if user_coins < bet:
-            await interaction.response.send_message(f"❌ You need {bet} coins! Your balance: {user_coins}", ephemeral=True)
+        user_wallet = server_data.get("coins", {}).get(user_id, 0)
+        user_bank = server_data.get("bank", {}).get(user_id, 0)
+        total_balance = user_wallet + user_bank
+        
+        if total_balance < bet:
+            await interaction.response.send_message(
+                f"❌ Insufficient funds!\n💰 Wallet: {user_wallet:,} | 🏦 Bank: {user_bank:,}\n**Need:** {bet:,} coins",
+                ephemeral=True
+            )
             return
         
         set_cooldown(user_id, "slots", server_data)
@@ -1155,7 +1162,7 @@ class Casino(commands.Cog):
         await save_data(data)
         
         embed = discord.Embed(title="🎰 Slot Machine", description="Choose your bet amount:", color=0xf1c40f)
-        embed.add_field(name="Your Balance", value=f"{user_coins:,} coins", inline=True)
+        embed.add_field(name="Your Balance", value=f"💰 {user_wallet:,} | 🏦 {user_bank:,}\n**Total:** {total_balance:,}", inline=True)
         embed.add_field(name="Current Bet", value=f"{bet} coins", inline=True)
         
         # Show active effects
