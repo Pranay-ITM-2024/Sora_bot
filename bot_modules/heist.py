@@ -9,7 +9,7 @@ from discord.ext import commands
 import random
 import asyncio
 from datetime import datetime, timedelta
-from .database import load_data, save_data
+from .database import load_data, save_data, get_server_data, save_server_data
 
 # ==================== MINIGAME MODALS ====================
 
@@ -296,7 +296,7 @@ def calculate_heist_difficulty(target_amount, target_guild_bank, bonuses):
 
 class HeistMemberSelectView(discord.ui.View):
     """View for guild leader to select heist team members"""
-    def __init__(self, leader_id, guild_name, target_guild, target_amount, guild_members, bot):
+    def __init__(self, leader_id, guild_name, target_guild, target_amount, guild_members, bot, discord_guild_id):
         super().__init__(timeout=120)
         self.leader_id = str(leader_id)
         self.guild_name = guild_name
@@ -304,6 +304,7 @@ class HeistMemberSelectView(discord.ui.View):
         self.target_amount = target_amount
         self.guild_members = guild_members
         self.bot = bot
+        self.discord_guild_id = str(discord_guild_id)
         self.selected_members = [str(leader_id)]  # Leader is always included
         
         # Add member selection dropdown
@@ -367,19 +368,20 @@ class HeistMemberSelectView(discord.ui.View):
         team = {member_id: None for member_id in self.selected_members}
         
         # Move to role selection
-        role_view = HeistRoleSelectView(self.leader_id, self.guild_name, self.target_guild, self.target_amount, team)
+        role_view = HeistRoleSelectView(self.leader_id, self.guild_name, self.target_guild, self.target_amount, team, self.discord_guild_id)
         embed = role_view.create_role_select_embed()
         await interaction.response.edit_message(embed=embed, view=role_view)
 
 class HeistRoleSelectView(discord.ui.View):
     """View for selecting roles for heist team"""
-    def __init__(self, leader_id, guild_name, target_guild, target_amount, team):
+    def __init__(self, leader_id, guild_name, target_guild, target_amount, team, discord_guild_id):
         super().__init__(timeout=120)
         self.leader_id = str(leader_id)
         self.guild_name = guild_name
         self.target_guild = target_guild
         self.target_amount = target_amount
         self.team = team  # user_id: role (None initially)
+        self.discord_guild_id = str(discord_guild_id)
         self.add_role_selects()
     
     def add_role_selects(self):
@@ -432,11 +434,13 @@ class HeistRoleSelectView(discord.ui.View):
         
         # Set GUILD cooldown (one heist per guild per Sunday)
         data = await load_data()
-        data.setdefault("cooldowns", {}).setdefault("guild_heist", {})[self.guild_name] = datetime.utcnow().isoformat()
+        server_data = get_server_data(data, self.discord_guild_id)
+        server_data.setdefault("cooldowns", {}).setdefault("guild_heist", {})[self.guild_name] = datetime.utcnow().isoformat()
+        save_server_data(data, self.discord_guild_id, server_data)
         await save_data(data)
         
         # Start multiplayer heist
-        heist_view = MultiplayerHeistView(self.leader_id, self.guild_name, self.target_guild, self.target_amount, self.team)
+        heist_view = MultiplayerHeistView(self.leader_id, self.guild_name, self.target_guild, self.target_amount, self.team, self.discord_guild_id)
         embed = await heist_view.create_phase_embed()
         await interaction.response.edit_message(embed=embed, view=heist_view)
     
@@ -460,13 +464,14 @@ class HeistRoleSelectView(discord.ui.View):
 
 class MultiplayerHeistView(discord.ui.View):
     """Multiplayer heist gameplay with role-based tasks"""
-    def __init__(self, leader_id, guild_name, target_guild, target_amount, team):
+    def __init__(self, leader_id, guild_name, target_guild, target_amount, team, discord_guild_id):
         super().__init__(timeout=300)
         self.leader_id = str(leader_id)
         self.guild_name = guild_name
         self.target_guild = target_guild
         self.target_amount = target_amount
         self.team = team  # user_id: role
+        self.discord_guild_id = str(discord_guild_id)
         self.phase = 1
         self.noise_level = 0
         self.team_progress = {uid: 0 for uid in team.keys()}  # Individual progress
@@ -476,7 +481,8 @@ class MultiplayerHeistView(discord.ui.View):
     async def create_phase_embed(self):
         """Create the heist phase display"""
         data = await load_data()
-        team_bonuses = get_team_bonuses(self.team.keys(), data)
+        server_data = get_server_data(data, self.discord_guild_id)
+        team_bonuses = get_team_bonuses(self.team.keys(), server_data)
         
         # Calculate team progress (average)
         total_progress = sum(self.team_progress.values())
@@ -642,6 +648,7 @@ class MultiplayerHeistView(discord.ui.View):
     async def fail_heist(self, interaction, failed_user_id, failed_role):
         """Handle multiplayer heist failure"""
         data = await load_data()
+        server_data = get_server_data(data, self.discord_guild_id)
         
         # Calculate penalty (split among team)
         total_penalty = int(self.target_amount * 0.3)  # 30% of attempted steal
@@ -652,33 +659,34 @@ class MultiplayerHeistView(discord.ui.View):
         
         # Charge each team member
         for user_id in self.team.keys():
-            user_coins = data.get("coins", {}).get(user_id, 0)
-            user_bank = data.get("bank", {}).get(user_id, 0)
+            user_coins = server_data.get("coins", {}).get(user_id, 0)
+            user_bank = server_data.get("bank", {}).get(user_id, 0)
             total_money = user_coins + user_bank
             
             # Take penalty
             if total_money >= penalty_per_person:
                 if user_coins >= penalty_per_person:
-                    data.setdefault("coins", {})[user_id] = user_coins - penalty_per_person
+                    server_data.setdefault("coins", {})[user_id] = user_coins - penalty_per_person
                 else:
-                    data.setdefault("coins", {})[user_id] = 0
-                    data.setdefault("bank", {})[user_id] = user_bank - (penalty_per_person - user_coins)
+                    server_data.setdefault("coins", {})[user_id] = 0
+                    server_data.setdefault("bank", {})[user_id] = user_bank - (penalty_per_person - user_coins)
                 total_paid += penalty_per_person
                 penalty_details.append(f"<@{user_id}>: -{penalty_per_person:,} coins")
             else:
                 # Can't afford full penalty - add debt
                 debt_amount = penalty_per_person - total_money
-                data.setdefault("coins", {})[user_id] = 0
-                data.setdefault("bank", {})[user_id] = 0
-                data.setdefault("debt", {})[user_id] = data.get("debt", {}).get(user_id, 0) + debt_amount
+                server_data.setdefault("coins", {})[user_id] = 0
+                server_data.setdefault("bank", {})[user_id] = 0
+                server_data.setdefault("debt", {})[user_id] = server_data.get("debt", {}).get(user_id, 0) + debt_amount
                 total_paid += total_money
                 penalty_details.append(f"<@{user_id}>: -{total_money:,} coins + {debt_amount:,} debt")
         
         # Pay to target guild's bank
-        target_guild_data = data.get("guilds", {}).get(self.target_guild, {})
+        target_guild_data = server_data.get("guilds", {}).get(self.target_guild, {})
         target_guild_data["bank"] = target_guild_data.get("bank", 0) + total_paid
-        data.setdefault("guilds", {})[self.target_guild] = target_guild_data
+        server_data.setdefault("guilds", {})[self.target_guild] = target_guild_data
         
+        save_server_data(data, self.discord_guild_id, server_data)
         await save_data(data, force=True)
         
         embed = discord.Embed(
@@ -700,21 +708,22 @@ class MultiplayerHeistView(discord.ui.View):
     async def complete_heist(self, interaction):
         """Handle successful multiplayer heist completion"""
         data = await load_data()
+        server_data = get_server_data(data, self.discord_guild_id)
         
         # Check if target guild still has the money
-        target_guild_data = data.get("guilds", {}).get(self.target_guild, {})
+        target_guild_data = server_data.get("guilds", {}).get(self.target_guild, {})
         current_target_bank = target_guild_data.get("bank", 0)
         
         actual_stolen = min(self.target_amount, current_target_bank)
         
         # Deduct from target guild
         target_guild_data["bank"] = current_target_bank - actual_stolen
-        data.setdefault("guilds", {})[self.target_guild] = target_guild_data
+        server_data.setdefault("guilds", {})[self.target_guild] = target_guild_data
         
         # Add to attacker's guild
-        attacker_guild_data = data.get("guilds", {}).get(self.guild_name, {})
+        attacker_guild_data = server_data.get("guilds", {}).get(self.guild_name, {})
         attacker_guild_data["bank"] = attacker_guild_data.get("bank", 0) + actual_stolen
-        data.setdefault("guilds", {})[self.guild_name] = attacker_guild_data
+        server_data.setdefault("guilds", {})[self.guild_name] = attacker_guild_data
         
         # Distribute personal rewards (10% split among team)
         total_personal_reward = int(actual_stolen * 0.1)
@@ -722,9 +731,10 @@ class MultiplayerHeistView(discord.ui.View):
         
         reward_details = []
         for user_id in self.team.keys():
-            data.setdefault("coins", {})[user_id] = data.get("coins", {}).get(user_id, 0) + reward_per_person
+            server_data.setdefault("coins", {})[user_id] = server_data.get("coins", {}).get(user_id, 0) + reward_per_person
             reward_details.append(f"<@{user_id}>: +{reward_per_person:,} coins")
         
+        save_server_data(data, self.discord_guild_id, server_data)
         await save_data(data, force=True)
         
         embed = discord.Embed(
@@ -746,12 +756,13 @@ class MultiplayerHeistView(discord.ui.View):
 
 class SoloHeistView(discord.ui.View):
     """Solo heist gameplay for single player"""
-    def __init__(self, user_id, guild_name, target_guild, target_amount):
+    def __init__(self, user_id, guild_name, target_guild, target_amount, discord_guild_id):
         super().__init__(timeout=180)
         self.user_id = str(user_id)
         self.guild_name = guild_name
         self.target_guild = target_guild
         self.target_amount = target_amount
+        self.discord_guild_id = str(discord_guild_id)
         self.phase = 1
         self.noise_level = 0
         self.progress = 0
@@ -759,7 +770,8 @@ class SoloHeistView(discord.ui.View):
     async def create_solo_embed(self):
         """Create solo heist display"""
         data = await load_data()
-        bonuses = get_heist_gear_bonuses(self.user_id, data)
+        server_data = get_server_data(data, self.discord_guild_id)
+        bonuses = get_heist_gear_bonuses(self.user_id, server_data)
         
         progress_bar = "🟩" * (self.progress // 10) + "⬜" * ((100 - self.progress) // 10)
         noise_bar = "🔴" * (self.noise_level // 20) + "⬜" * ((100 - self.noise_level) // 20)
@@ -941,22 +953,24 @@ class SoloHeistView(discord.ui.View):
     async def complete_solo_heist(self, interaction):
         """Handle solo heist success"""
         data = await load_data()
+        server_data = get_server_data(data, self.discord_guild_id)
         
-        target_guild_data = data.get("guilds", {}).get(self.target_guild, {})
+        target_guild_data = server_data.get("guilds", {}).get(self.target_guild, {})
         current_target_bank = target_guild_data.get("bank", 0)
         
         actual_stolen = min(self.target_amount, current_target_bank)
         
         target_guild_data["bank"] = current_target_bank - actual_stolen
-        data.setdefault("guilds", {})[self.target_guild] = target_guild_data
+        server_data.setdefault("guilds", {})[self.target_guild] = target_guild_data
         
-        attacker_guild_data = data.get("guilds", {}).get(self.guild_name, {})
+        attacker_guild_data = server_data.get("guilds", {}).get(self.guild_name, {})
         attacker_guild_data["bank"] = attacker_guild_data.get("bank", 0) + actual_stolen
-        data.setdefault("guilds", {})[self.guild_name] = attacker_guild_data
+        server_data.setdefault("guilds", {})[self.guild_name] = attacker_guild_data
         
         personal_reward = int(actual_stolen * 0.1)
-        data.setdefault("coins", {})[self.user_id] = data.get("coins", {}).get(self.user_id, 0) + personal_reward
+        server_data.setdefault("coins", {})[self.user_id] = server_data.get("coins", {}).get(self.user_id, 0) + personal_reward
         
+        save_server_data(data, self.discord_guild_id, server_data)
         await save_data(data, force=True)
         
         embed = discord.Embed(
@@ -981,7 +995,10 @@ class HeistCog(commands.Cog):
     @app_commands.describe(target_guild="The guild to target", amount="Amount to steal (0 = max 50%)")
     async def heist(self, interaction: discord.Interaction, target_guild: str, amount: int = 0):
         user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id)
+        
         data = await load_data()
+        server_data = get_server_data(data, guild_id)
         
         # Check if it's Sunday
         now = datetime.utcnow()
@@ -998,7 +1015,7 @@ class HeistCog(commands.Cog):
         # Get user's guild
         user_guild = None
         guild_members = []
-        for guild_name, members in data.get("guild_members", {}).items():
+        for guild_name, members in server_data.get("guild_members", {}).items():
             if user_id in members:
                 user_guild = guild_name
                 guild_members = members
@@ -1009,7 +1026,7 @@ class HeistCog(commands.Cog):
             return
         
         # Check if user is guild leader
-        guild_data = data.get("guilds", {}).get(user_guild, {})
+        guild_data = server_data.get("guilds", {}).get(user_guild, {})
         guild_owner = guild_data.get("owner")
         
         if str(guild_owner) != user_id:
@@ -1021,7 +1038,7 @@ class HeistCog(commands.Cog):
             return
         
         # Check guild cooldown (1 heist per Sunday per GUILD, not per user)
-        guild_cooldowns = data.get("cooldowns", {}).get("guild_heist", {})
+        guild_cooldowns = server_data.get("cooldowns", {}).get("guild_heist", {})
         last_guild_heist = guild_cooldowns.get(user_guild)
         
         if last_guild_heist:
@@ -1036,15 +1053,16 @@ class HeistCog(commands.Cog):
                 return
         
         # Mark target guild as heist-attempted (unlocks withdrawal)
-        withdrawal_locks = data.get("withdrawal_locks", {})
+        withdrawal_locks = server_data.get("withdrawal_locks", {})
         if target_guild in withdrawal_locks:
             withdrawal_locks[target_guild]["heist_attempted"] = True
             withdrawal_locks[target_guild]["locked"] = False
-            data["withdrawal_locks"] = withdrawal_locks
+            server_data["withdrawal_locks"] = withdrawal_locks
+            save_server_data(data, guild_id, server_data)
             await save_data(data)
         
         # Check target guild exists
-        if target_guild not in data.get("guilds", {}):
+        if target_guild not in server_data.get("guilds", {}):
             await interaction.response.send_message(f"❌ Guild **{target_guild}** doesn't exist!", ephemeral=True)
             return
         
@@ -1054,7 +1072,7 @@ class HeistCog(commands.Cog):
             return
         
         # Get target guild bank
-        target_guild_data = data.get("guilds", {}).get(target_guild, {})
+        target_guild_data = server_data.get("guilds", {}).get(target_guild, {})
         target_bank = target_guild_data.get("bank", 0)
         
         if target_bank < 1000:
@@ -1075,7 +1093,7 @@ class HeistCog(commands.Cog):
             return
         
         # Calculate difficulty and show preview
-        bonuses = get_heist_gear_bonuses(user_id, data)
+        bonuses = get_heist_gear_bonuses(user_id, server_data)
         difficulty, steal_percent = calculate_heist_difficulty(target_amount, target_bank, bonuses)
         
         embed = discord.Embed(
@@ -1101,11 +1119,11 @@ class HeistCog(commands.Cog):
         
         embed.set_footer(text="⚠️ Leader Only - Select team members for multiplayer heists!")
         
-        view = HeistConfirmView(user_id, user_guild, target_guild, target_amount, guild_members, self.bot)
+        view = HeistConfirmView(user_id, user_guild, target_guild, target_amount, guild_members, self.bot, guild_id)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 class HeistConfirmView(discord.ui.View):
-    def __init__(self, user_id, guild_name, target_guild, target_amount, guild_members, bot):
+    def __init__(self, user_id, guild_name, target_guild, target_amount, guild_members, bot, discord_guild_id):
         super().__init__(timeout=60)
         self.user_id = user_id
         self.guild_name = guild_name
@@ -1113,6 +1131,7 @@ class HeistConfirmView(discord.ui.View):
         self.target_amount = target_amount
         self.guild_members = guild_members
         self.bot = bot
+        self.discord_guild_id = str(discord_guild_id)
     
     @discord.ui.button(label="Solo Heist", style=discord.ButtonStyle.primary, emoji="🥷", row=0)
     async def solo_heist(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1122,11 +1141,13 @@ class HeistConfirmView(discord.ui.View):
         
         # Set guild cooldown
         data = await load_data()
-        data.setdefault("cooldowns", {}).setdefault("guild_heist", {})[self.guild_name] = datetime.utcnow().isoformat()
+        server_data = get_server_data(data, self.discord_guild_id)
+        server_data.setdefault("cooldowns", {}).setdefault("guild_heist", {})[self.guild_name] = datetime.utcnow().isoformat()
+        save_server_data(data, self.discord_guild_id, server_data)
         await save_data(data)
         
         # Start solo heist
-        heist_view = SoloHeistView(self.user_id, self.guild_name, self.target_guild, self.target_amount)
+        heist_view = SoloHeistView(self.user_id, self.guild_name, self.target_guild, self.target_amount, self.discord_guild_id)
         embed = await heist_view.create_solo_embed()
         await interaction.response.edit_message(embed=embed, view=heist_view)
     
@@ -1143,7 +1164,8 @@ class HeistConfirmView(discord.ui.View):
             self.target_guild, 
             self.target_amount, 
             self.guild_members,
-            self.bot
+            self.bot,
+            self.discord_guild_id
         )
         
         embed = discord.Embed(
