@@ -187,9 +187,10 @@ def add_transaction(user_id, amount, reason, data, tx_type="credit"):
     data.setdefault("transactions", {}).setdefault(str(user_id), []).append(tx)
 
 class SlotsView(discord.ui.View):
-    def __init__(self, user_id):
+    def __init__(self, user_id, guild_id):
         super().__init__(timeout=300)
         self.user_id = user_id
+        self.guild_id = guild_id
 
     @discord.ui.button(label="Spin Again (10 coins)", style=discord.ButtonStyle.primary, emoji="🎰")
     async def spin_again(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -206,13 +207,33 @@ class SlotsView(discord.ui.View):
             return
         
         await self.play_slots(interaction, 50)
+    
+    @discord.ui.button(label="📊 Paytable", style=discord.ButtonStyle.secondary, emoji="📋", row=1)
+    async def show_paytable(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Show the mathematical paytable"""
+        from .slots_math import get_slot_machine
+        slot_machine = get_slot_machine()
+        
+        embed = discord.Embed(
+            title="🎰 Slot Machine Paytable",
+            description=slot_machine.get_paytable(),
+            color=0xf1c40f
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def play_slots(self, interaction, bet):
+        from .slots_math import get_slot_machine
+        from .database import get_server_data, save_server_data
+        
+        guild_id = str(self.guild_id)
         data = await load_data()
+        server_data = get_server_data(data, guild_id)
         user_id = str(interaction.user.id)
         
-        # Check total balance (wallet + bank)
-        wallet, bank, total = get_total_balance(user_id, data)
+        # Check balance
+        wallet = server_data.get("coins", {}).get(user_id, 0)
+        bank = server_data.get("bank", {}).get(user_id, 0)
+        total = wallet + bank
         
         if total < bet:
             await interaction.response.send_message(
@@ -221,105 +242,125 @@ class SlotsView(discord.ui.View):
             )
             return
         
-        # Deduct bet from wallet/bank
-        deduct_bet(user_id, bet, data)
+        # Deduct bet from wallet first, then bank
+        if wallet >= bet:
+            server_data.setdefault("coins", {})[user_id] = wallet - bet
+        else:
+            remaining = bet - wallet
+            server_data.setdefault("coins", {})[user_id] = 0
+            server_data.setdefault("bank", {})[user_id] = bank - remaining
         
-        # Get bonuses
-        effects = await get_gambling_effects(user_id, data)
+        # Get item bonuses
+        effects = await get_gambling_effects(user_id, server_data)
+        bonus_multiplier = 1.0 + effects.get("payout_bonus", 0.0)
         
-        # Slot symbols with weights
-        symbols = ["🍒", "🍋", "🍊", "🍇", "⭐", "💎"]
-        weights = [30, 25, 20, 15, 8, 2]  # Rarer symbols have lower weights
+        # Get the mathematical slot machine
+        slot_machine = get_slot_machine()
         
-        # Spin the reels
-        reel1 = random.choices(symbols, weights=weights)[0]
-        reel2 = random.choices(symbols, weights=weights)[0]
-        reel3 = random.choices(symbols, weights=weights)[0]
+        # Spin the reels (5 reels now!)
+        result, winnings, details = slot_machine.spin(bet, bonus_multiplier)
         
-        # Calculate winnings
-        winnings = 0
-        win_text = ""
-        
-        if reel1 == reel2 == reel3:  # Three of a kind
-            multipliers = {"🍒": 3, "🍋": 4, "🍊": 5, "🍇": 8, "⭐": 15, "💎": 50}
-            winnings = bet * multipliers.get(reel1, 3)
-            win_text = f"🎉 JACKPOT! Three {reel1}s!"
-        elif reel1 == reel2 or reel2 == reel3 or reel1 == reel3:  # Two of a kind
-            winnings = bet * 2
-            win_text = "🎊 Two of a kind!"
-        
-        # Apply bonuses
-        if winnings > 0:
-            # Apply payout bonus
-            if effects["payout_bonus"] > 0:
-                bonus_amount = int(winnings * effects["payout_bonus"])
-                winnings += bonus_amount
-                win_text += f"\n💰 Item bonus: +{bonus_amount} coins!"
-            
-            # Consume potions/boosters if used (only on win)
-            await consume_item_effect(user_id, "luck_potion", data)
-            await consume_item_effect(user_id, "jackpot_booster", data)
-            await consume_item_effect(user_id, "mega_lucky_potion", data)
-        
-        # Handle loss with insurance
+        # Handle insurance on losses
         net_result = winnings - bet
-        if net_result < 0 and effects["insurance"]:
+        insurance_activated = False
+        if net_result < 0 and effects.get("insurance", False):
             refund = bet // 2
+            winnings += refund
             net_result += refund
-            win_text = f"🛡️ Insurance activated! Refunded {refund} coins"
-            await consume_item_effect(user_id, "insurance_scroll", data)
+            insurance_activated = True
+            # Consume insurance item
+            inventory = server_data.get("inventories", {}).get(user_id, {})
+            if "insurance_scroll" in inventory and inventory["insurance_scroll"] > 0:
+                inventory["insurance_scroll"] -= 1
         
-        # Add winnings to wallet (bet already deducted)
+        # Add winnings to wallet
         if winnings > 0:
-            current_wallet = data.get("coins", {}).get(user_id, 0)
-            data.setdefault("coins", {})[user_id] = current_wallet + winnings
-            add_transaction(user_id, winnings, f"Slots win", data, "credit")
+            current_wallet = server_data.get("coins", {}).get(user_id, 0)
+            server_data.setdefault("coins", {})[user_id] = current_wallet + winnings
+            
+            # Consume bonus items on wins
+            inventory = server_data.get("inventories", {}).get(user_id, {})
+            for item in ["luck_potion", "jackpot_booster", "mega_lucky_potion"]:
+                if item in inventory and inventory[item] > 0:
+                    inventory[item] -= 1
         
-        # Track casino stats (win or loss)
-        track_casino_game(user_id, "slots", winnings > 0, bet, winnings, data)
+        # Track casino stats
+        stats = server_data.setdefault("casino_stats", {}).setdefault(user_id, {
+            "slots_played": 0, "slots_won": 0, "total_wagered": 0, "total_won": 0
+        })
+        stats["slots_played"] = stats.get("slots_played", 0) + 1
+        if winnings > 0:
+            stats["slots_won"] = stats.get("slots_won", 0) + 1
+        stats["total_wagered"] = stats.get("total_wagered", 0) + bet
+        stats["total_won"] = stats.get("total_won", 0) + winnings
         
+        save_server_data(data, guild_id, server_data)
         await save_data(data, force=True)
         
-        # Get new balance for display
-        new_wallet, new_bank, new_total = get_total_balance(user_id, data)
-        
-        # Check if it's a jackpot (three of a kind) for announcement
-        is_jackpot = reel1 == reel2 == reel3
+        # Get new balance
+        new_wallet = server_data.get("coins", {}).get(user_id, 0)
+        new_bank = server_data.get("bank", {}).get(user_id, 0)
         
         # Create result embed
-        embed = discord.Embed(title="🎰 Slot Machine", color=0xf1c40f if winnings > 0 else 0xe74c3c)
-        embed.add_field(name="Reels", value=f"[ {reel1} | {reel2} | {reel3} ]", inline=False)
-        embed.add_field(name="Bet", value=f"{bet} coins", inline=True)
-        embed.add_field(name="Won", value=f"{winnings} coins", inline=True)
-        embed.add_field(name="Net", value=f"{'+'if net_result >= 0 else ''}{net_result} coins", inline=True)
-        embed.add_field(name="💰 Wallet", value=f"{new_wallet:,} coins", inline=True)
-        embed.add_field(name="🏦 Bank", value=f"{new_bank:,} coins", inline=True)
+        is_big_win = details["win_type"] in ["MEGA JACKPOT", "JACKPOT", "BIG WIN"]
+        embed = discord.Embed(
+            title="🎰 Mathematical Slot Machine (94.8% RTP)",
+            color=0xFFD700 if is_big_win else (0x00ff00 if winnings > 0 else 0xe74c3c)
+        )
         
-        if win_text:
-            embed.add_field(name="Result", value=win_text, inline=False)
+        # Display 5 reels
+        reels_display = " | ".join(result)
+        embed.add_field(name="🎰 Reels", value=f"[ {reels_display} ]", inline=False)
         
-        view = SlotsView(user_id)
+        # Win details
+        if details["win"]:
+            win_msg = f"**{details['win_type']}!**\n"
+            win_msg += f"{details['symbol']} × {details['matches']}"
+            
+            if details["bonus_applied"]:
+                win_msg += f"\n💎 Bonus: +{details['bonus_amount']:,} coins"
+            
+            if details["free_spins_triggered"]:
+                win_msg += f"\n🎰 **{details['free_spins_count']} FREE SPINS!** 🎰"
+            
+            embed.add_field(name="✨ Result", value=win_msg, inline=False)
+        elif insurance_activated:
+            embed.add_field(name="🛡️ Insurance", value="Activated! 50% refund", inline=False)
+        
+        # Stats
+        embed.add_field(name="💵 Bet", value=f"{bet:,}", inline=True)
+        embed.add_field(name="🎁 Won", value=f"{winnings:,}", inline=True)
+        embed.add_field(name="📊 Net", value=f"{'+'if net_result >= 0 else ''}{net_result:,}", inline=True)
+        embed.add_field(name="💰 Wallet", value=f"{new_wallet:,}", inline=True)
+        embed.add_field(name="🏦 Bank", value=f"{new_bank:,}", inline=True)
+        
+        # Add scatter info if present
+        if details["scatter_count"] > 0:
+            scatter_msg = f"{details['scatter_count']} scatter symbols"
+            if details["free_spins_triggered"]:
+                scatter_msg += f" → {details['free_spins_count']} FREE SPINS!"
+            embed.add_field(name="🎰 Scatters", value=scatter_msg, inline=False)
+        
+        embed.set_footer(text="📊 Mathematically fair • 94.8% RTP • Provably balanced")
+        
+        view = SlotsView(user_id, guild_id)
         await interaction.response.edit_message(embed=embed, view=view)
         
-        # Send public announcement for jackpots
-        if is_jackpot:
+        # Send public announcement for big wins
+        if is_big_win:
             try:
-                multipliers = {"🍒": 3, "🍋": 4, "🍊": 5, "🍇": 8, "⭐": 15, "💎": 50}
-                multiplier = multipliers.get(reel1, 3)
-                
                 announcement = discord.Embed(
-                    title="🎰💰 JACKPOT ALERT! 💰🎰",
-                    description=f"**{interaction.user.mention}** just hit a JACKPOT!",
-                    color=0xFFD700  # Gold color
+                    title=f"🎰💰 {details['win_type']}! 💰🎰",
+                    description=f"**{interaction.user.mention}** hit a massive win!",
+                    color=0xFFD700
                 )
-                announcement.add_field(name="Winning Combo", value=f"[ {reel1} | {reel2} | {reel3} ]", inline=False)
-                announcement.add_field(name="Bet Amount", value=f"{bet:,} coins", inline=True)
-                announcement.add_field(name="Multiplier", value=f"x{multiplier}", inline=True)
-                announcement.add_field(name="Total Winnings", value=f"🎉 **{winnings:,} coins!** 🎉", inline=True)
+                announcement.add_field(name="🎰 Reels", value=f"[ {reels_display} ]", inline=False)
+                announcement.add_field(name="💵 Bet", value=f"{bet:,} coins", inline=True)
+                announcement.add_field(name="🎁 Won", value=f"**{winnings:,} coins!**", inline=True)
+                announcement.add_field(name="✨ Win", value=f"{details['symbol']} × {details['matches']}", inline=True)
                 announcement.set_thumbnail(url=interaction.user.display_avatar.url)
-                announcement.set_footer(text="🎰 Try your luck with /slots!")
+                announcement.set_footer(text="🎰 94.8% RTP • Mathematically balanced")
                 
-                # Use followup to send public message after editing the original
                 await interaction.followup.send(embed=announcement)
             except Exception as e:
                 print(f"Failed to send jackpot announcement: {e}")
