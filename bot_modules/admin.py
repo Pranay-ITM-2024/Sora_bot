@@ -104,17 +104,22 @@ class Admin(commands.Cog):
             await interaction.response.send_message("❌ Location must be either 'wallet' or 'bank'!", ephemeral=True)
             return
         
+        guild_id = str(interaction.guild_id)
         data = await load_data()
+        from .database import get_server_data, save_server_data
+        server_data = get_server_data(data, guild_id)
+        
         user_id = str(user.id)
         
         # Add coins to the specified location
         if location == "wallet":
-            current = data.get("coins", {}).get(user_id, 0)
-            data.setdefault("coins", {})[user_id] = current + amount
+            current = server_data.get("coins", {}).get(user_id, 0)
+            server_data.setdefault("coins", {})[user_id] = current + amount
         else:  # bank
-            current = data.get("bank", {}).get(user_id, 0)
-            data.setdefault("bank", {})[user_id] = current + amount
+            current = server_data.get("bank", {}).get(user_id, 0)
+            server_data.setdefault("bank", {})[user_id] = current + amount
         
+        save_server_data(data, guild_id, server_data)
         await save_data(data)
         
         embed = discord.Embed(title="💰 Coins Given", color=0x00ff00)
@@ -123,7 +128,7 @@ class Admin(commands.Cog):
         embed.add_field(name="Amount", value=f"{amount:,} coins", inline=True)
         embed.add_field(name="Location", value=location.title(), inline=True)
         
-        new_amount = data.get("coins" if location == "wallet" else "bank", {}).get(user_id, 0)
+        new_amount = server_data.get("coins" if location == "wallet" else "bank", {}).get(user_id, 0)
         embed.add_field(name=f"New {location.title()} Balance", value=f"{new_amount:,} coins", inline=False)
         embed.set_footer(text=f"Admin: {interaction.user.display_name}")
         
@@ -146,43 +151,48 @@ class Admin(commands.Cog):
             await interaction.response.send_message("❌ Location must be 'wallet', 'bank', or 'both'!", ephemeral=True)
             return
         
+        guild_id = str(interaction.guild_id)
         data = await load_data()
+        from .database import get_server_data, save_server_data
+        server_data = get_server_data(data, guild_id)
+        
         user_id = str(user.id)
         
-        wallet = data.get("coins", {}).get(user_id, 0)
-        bank = data.get("bank", {}).get(user_id, 0)
+        wallet = server_data.get("coins", {}).get(user_id, 0)
+        bank = server_data.get("bank", {}).get(user_id, 0)
         
         taken_from = []
         total_taken = 0
         
         if location == "wallet":
             taken = min(amount, wallet)
-            data.setdefault("coins", {})[user_id] = wallet - taken
+            server_data.setdefault("coins", {})[user_id] = wallet - taken
             total_taken = taken
             taken_from.append(f"💰 Wallet: {taken:,}")
         elif location == "bank":
             taken = min(amount, bank)
-            data.setdefault("bank", {})[user_id] = bank - taken
+            server_data.setdefault("bank", {})[user_id] = bank - taken
             total_taken = taken
             taken_from.append(f"🏦 Bank: {taken:,}")
         else:  # both
             # Take from wallet first, then bank
             if wallet >= amount:
-                data.setdefault("coins", {})[user_id] = wallet - amount
+                server_data.setdefault("coins", {})[user_id] = wallet - amount
                 total_taken = amount
                 taken_from.append(f"💰 Wallet: {amount:,}")
             else:
                 # Take all from wallet, rest from bank
                 remaining = amount - wallet
                 taken_from_bank = min(remaining, bank)
-                data.setdefault("coins", {})[user_id] = 0
-                data.setdefault("bank", {})[user_id] = bank - taken_from_bank
+                server_data.setdefault("coins", {})[user_id] = 0
+                server_data.setdefault("bank", {})[user_id] = bank - taken_from_bank
                 total_taken = wallet + taken_from_bank
                 if wallet > 0:
                     taken_from.append(f"💰 Wallet: {wallet:,}")
                 if taken_from_bank > 0:
                     taken_from.append(f"🏦 Bank: {taken_from_bank:,}")
         
+        save_server_data(data, guild_id, server_data)
         await save_data(data)
         
         embed = discord.Embed(title="💸 Coins Taken", color=0xe74c3c)
@@ -194,8 +204,8 @@ class Admin(commands.Cog):
         if taken_from:
             embed.add_field(name="Taken From", value="\n".join(taken_from), inline=False)
         
-        new_wallet = data.get("coins", {}).get(user_id, 0)
-        new_bank = data.get("bank", {}).get(user_id, 0)
+        new_wallet = server_data.get("coins", {}).get(user_id, 0)
+        new_bank = server_data.get("bank", {}).get(user_id, 0)
         embed.add_field(name="New Balances", value=f"💰 {new_wallet:,} | 🏦 {new_bank:,}", inline=False)
         
         if total_taken < amount:
@@ -212,17 +222,21 @@ class Admin(commands.Cog):
             await interaction.response.send_message("❌ You don't have permission to use this command!", ephemeral=True)
             return
         
+        guild_id = str(interaction.guild_id)
+        
         try:
             data = await load_data()
+            from .database import get_server_data
+            server_data = get_server_data(data, guild_id)
         except:
-            data = {}
+            server_data = {}
         
-        # Calculate some basic stats
-        total_users = len(set(list(data.get("coins", {}).keys()) + list(data.get("bank", {}).keys())))
-        total_coins = sum(data.get("coins", {}).values()) + sum(data.get("bank", {}).values())
-        total_transactions = sum(len(txs) for txs in data.get("transactions", {}).values())
+        # Calculate some basic stats for THIS server
+        total_users = len(set(list(server_data.get("coins", {}).keys()) + list(server_data.get("bank", {}).keys())))
+        total_coins = sum(server_data.get("coins", {}).values()) + sum(server_data.get("bank", {}).values())
+        total_transactions = sum(len(txs) for txs in server_data.get("transactions", {}).values())
         
-        embed = discord.Embed(title="📊 Economy Status", color=0x2ecc71)
+        embed = discord.Embed(title="📊 Economy Status (This Server)", color=0x2ecc71)
         embed.add_field(name="👥 Total Users", value=f"{total_users:,}", inline=True)
         embed.add_field(name="💰 Total Coins", value=f"{total_coins:,}", inline=True)
         embed.add_field(name="📋 Transactions", value=f"{total_transactions:,}", inline=True)
@@ -230,7 +244,7 @@ class Admin(commands.Cog):
         embed.add_field(name="📈 Stock Market", value="Active", inline=True)
         embed.add_field(name="🎮 Games", value="Active", inline=True)
         
-        embed.set_footer(text="Economy system operational")
+        embed.set_footer(text="Per-server economy system | Each Discord server has separate data")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 async def setup(bot):
