@@ -289,19 +289,6 @@ class DepositModal(discord.ui.Modal, title="💰 Guild Bank Deposit"):
             
         server_data["guilds"][self.guild_name]["bank"] = server_data["guilds"][self.guild_name].get("bank", 0) + deposit_amount
         
-        # Add to transactions
-        if "transactions" not in server_data:
-            server_data["transactions"] = {}
-        if user_id not in server_data["transactions"]:
-            server_data["transactions"][user_id] = []
-        
-        server_data["transactions"][user_id].append({
-            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"),
-            "type": "debit",
-            "amount": deposit_amount,
-            "reason": f"Guild bank deposit to {self.guild_name}"
-        })
-        
         save_server_data(data, self.discord_guild_id, server_data)
         await save_data(data)
 
@@ -373,19 +360,6 @@ class WithdrawModal(discord.ui.Modal, title="💸 Guild Bank Withdrawal"):
         if "coins" not in server_data:
             server_data["coins"] = {}
         server_data["coins"][user_id] = server_data["coins"].get(user_id, 0) + withdraw_amount
-        
-        # Add to transactions
-        if "transactions" not in server_data:
-            server_data["transactions"] = {}
-        if user_id not in server_data["transactions"]:
-            server_data["transactions"][user_id] = []
-        
-        server_data["transactions"][user_id].append({
-            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"),
-            "type": "credit",
-            "amount": withdraw_amount,
-            "reason": f"Guild bank withdrawal from {self.guild_name}"
-        })
         
         save_server_data(data, self.discord_guild_id, server_data)
         await save_data(data)

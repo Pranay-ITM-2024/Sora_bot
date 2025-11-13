@@ -289,55 +289,105 @@ async def market_update_task():
     except Exception as e:
         logging.error(f"Market update failed: {e}")
 
-@tasks.loop(minutes=10)
+@tasks.loop(hours=1)
 async def interest_task():
-    """Calculate interest on bank accounts with bonus for top guild"""
+    """Calculate daily bank interest (0.5% per 24hrs) and weekly guild bank interest (5% + 5% bonus for #1 guild)"""
     try:
+        now = datetime.datetime.utcnow()
         data = await data_manager.load_data()
-        config = data.get("config", {})
-        interest_rate = config.get("interest_rate", 0.001)
+        
+        # Check if we need to run daily interest (every 24 hours)
+        last_daily_interest = data.get("_meta", {}).get("last_daily_interest")
+        should_run_daily = False
+        
+        if last_daily_interest:
+            last_time = datetime.datetime.fromisoformat(last_daily_interest)
+            if (now - last_time).total_seconds() >= 86400:  # 24 hours
+                should_run_daily = True
+        else:
+            should_run_daily = True
+        
+        # Check if we need to run weekly guild interest (every 7 days)
+        last_weekly_interest = data.get("_meta", {}).get("last_weekly_guild_interest")
+        should_run_weekly = False
+        
+        if last_weekly_interest:
+            last_time = datetime.datetime.fromisoformat(last_weekly_interest)
+            if (now - last_time).total_seconds() >= 604800:  # 7 days
+                should_run_weekly = True
+        else:
+            should_run_weekly = True
+        
+        if not should_run_daily and not should_run_weekly:
+            return
         
         # Process each Discord server independently
         for guild_id, server_data in data.get("servers", {}).items():
-            bank_accounts = server_data.get("bank", {})
             
-            # Find the top guild by total bank balance for this server
-            guilds = server_data.get("guilds", {})
-            guild_members = server_data.get("guild_members", {})
-            top_guild = None
-            top_guild_balance = 0
-            top_guild_members = set()
+            # DAILY BANK INTEREST (0.5% per 24 hours)
+            if should_run_daily:
+                bank_accounts = server_data.get("bank", {})
+                total_interest_paid = 0
+                
+                for user_id, balance in bank_accounts.items():
+                    if balance > 0:
+                        interest = int(balance * 0.005)  # 0.5% daily interest
+                        if interest > 0:
+                            bank_accounts[user_id] = balance + interest
+                            total_interest_paid += interest
+                
+                server_data["bank"] = bank_accounts
+                if total_interest_paid > 0:
+                    logging.info(f"💰 [{guild_id}] Daily bank interest: {total_interest_paid:,} coins paid to users")
             
-            for guild_name, guild_data in guilds.items():
-                guild_bank = guild_data.get("bank", 0)
-                if guild_bank > top_guild_balance:
-                    top_guild_balance = guild_bank
-                    top_guild = guild_name
-                    top_guild_members = set(guild_members.get(guild_name, []))
-            
-            # Calculate interest for each user on this server
-            for user_id, balance in bank_accounts.items():
-                if balance > 0:
-                    # Base interest
-                    interest = int(balance * interest_rate)
-                    
-                    # Add 5% bonus if user is in top guild
-                    if user_id in top_guild_members:
-                        bonus = int(balance * 0.05)  # 5% bonus
-                        interest += bonus
-                    
-                    if interest > 0:
-                        bank_accounts[user_id] = balance + interest
-            
-            server_data["bank"] = bank_accounts
-            server_data.setdefault("_meta", {})["last_interest_ts"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
-            if top_guild:
-                server_data["_meta"]["last_top_guild"] = top_guild
+            # WEEKLY GUILD BANK INTEREST (5% base + 5% bonus for #1 guild)
+            if should_run_weekly:
+                guilds = server_data.get("guilds", {})
+                
+                # Find the top guild by total bank balance
+                top_guild = None
+                top_guild_balance = 0
+                
+                for guild_name, guild_data in guilds.items():
+                    guild_bank = guild_data.get("bank", 0)
+                    if guild_bank > top_guild_balance:
+                        top_guild_balance = guild_bank
+                        top_guild = guild_name
+                
+                # Apply interest to all guild banks
+                total_guild_interest = 0
+                for guild_name, guild_data in guilds.items():
+                    guild_bank = guild_data.get("bank", 0)
+                    if guild_bank > 0:
+                        # Base 5% weekly interest
+                        interest = int(guild_bank * 0.05)
+                        
+                        # Top guild gets additional 5% bonus
+                        if guild_name == top_guild:
+                            bonus = int(guild_bank * 0.05)
+                            interest += bonus
+                            logging.info(f"🏆 [{guild_id}] {guild_name} (TOP GUILD) earned {interest:,} coins (5% base + 5% bonus)")
+                        
+                        if interest > 0:
+                            guild_data["bank"] = guild_bank + interest
+                            total_guild_interest += interest
+                
+                server_data["guilds"] = guilds
+                if total_guild_interest > 0:
+                    logging.info(f"🏦 [{guild_id}] Weekly guild interest: {total_guild_interest:,} coins paid to guilds")
             
             save_server_data(data, guild_id, server_data)
-            logging.debug(f"💰 [{guild_id}] Interest calculated (Top guild: {top_guild or 'None'})")
         
-        await data_manager.save_data(data)
+        # Update timestamps
+        if should_run_daily:
+            data.setdefault("_meta", {})["last_daily_interest"] = now.isoformat()
+            logging.info("✅ Daily bank interest (0.5%) applied to all servers")
+        
+        if should_run_weekly:
+            data.setdefault("_meta", {})["last_weekly_guild_interest"] = now.isoformat()
+            logging.info("✅ Weekly guild bank interest (5% + 5% bonus) applied to all servers")
+        
+        await data_manager.save_data(data, force=True)
         
     except Exception as e:
         logging.error(f"Interest calculation failed: {e}")

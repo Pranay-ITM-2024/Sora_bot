@@ -127,7 +127,6 @@ class HelpCog(commands.Cog):
                   "• Give/take coins and items\n"
                   "• Economy freeze/unfreeze\n"
                   "• User data management\n"
-                  "• Transaction monitoring\n"
                   "*(Admin permissions required)*", 
             inline=True
         )

@@ -62,7 +62,6 @@ class DataManager:
             "bank": {},
             "last_daily": {},
             "last_weekly": {},
-            "transactions": {},
             "active_games": {},
             "companies": {},
             "items": {},

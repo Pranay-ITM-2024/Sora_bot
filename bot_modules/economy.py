@@ -172,7 +172,6 @@ def get_default_data():
         "bank": {},
         "last_daily": {},
         "last_weekly": {},
-        "transactions": {},
         "active_games": {},
         "companies": {},
         "items": {},
@@ -367,16 +366,6 @@ class Economy(commands.Cog):
         coins = server_data.get("coins", {}).get(user_id, 0) + remaining_amount
         server_data.setdefault("coins", {})[user_id] = coins
         server_data.setdefault("last_daily", {})[user_id] = now.strftime("%Y-%m-%d")
-        
-        # Add transaction
-        tx = {
-            "time": now.strftime("%Y-%m-%d %H:%M:%S UTC"), 
-            "type": "credit", 
-            "amount": final_amount, 
-            "reason": "Daily claim" + (f" (+{bonus_amount} bonus)" if bonus_amount > 0 else "")
-        }
-        server_data.setdefault("transactions", {}).setdefault(user_id, []).append(tx)
-        
         save_server_data(data, guild_id, server_data)
         await save_data(data, force=True)
         
@@ -469,15 +458,6 @@ class Economy(commands.Cog):
         server_data.setdefault("coins", {})[user_id] = coins
         server_data.setdefault("last_weekly", {})[user_id] = now.isoformat()
         
-        # Add transaction
-        tx = {
-            "time": now.strftime("%Y-%m-%d %H:%M:%S UTC"), 
-            "type": "credit", 
-            "amount": final_amount, 
-            "reason": "Weekly claim" + (f" (+{bonus_amount} bonus)" if bonus_amount > 0 else "")
-        }
-        server_data.setdefault("transactions", {}).setdefault(user_id, []).append(tx)
-        
         save_server_data(data, guild_id, server_data)
         await save_data(data, force=True)
         
@@ -560,14 +540,6 @@ class Economy(commands.Cog):
         server_data.setdefault("coins", {})[sender_id] = sender_coins - amount
         server_data.setdefault("coins", {})[receiver_id] = server_data.get("coins", {}).get(receiver_id, 0) + amount
         
-        # Add transactions
-        now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
-        sender_tx = {"time": now, "type": "debit", "amount": amount, "reason": f"Payment to {user.display_name}"}
-        receiver_tx = {"time": now, "type": "credit", "amount": amount, "reason": f"Payment from {interaction.user.display_name}"}
-        
-        server_data.setdefault("transactions", {}).setdefault(sender_id, []).append(sender_tx)
-        server_data.setdefault("transactions", {}).setdefault(receiver_id, []).append(receiver_tx)
-        
         save_server_data(data, guild_id, server_data)
         await save_data(data)
         
@@ -617,10 +589,6 @@ class Economy(commands.Cog):
         bank = server_data.get("bank", {}).get(user_id, 0)
         total_wealth = coins + bank
         
-        # Get transaction count
-        transactions = server_data.get("transactions", {}).get(user_id, [])
-        transaction_count = len(transactions)
-        
         # Get equipped items
         equipped = server_data.get("equipped", {}).get(user_id, {})
         
@@ -636,7 +604,7 @@ class Economy(commands.Cog):
         
         embed.add_field(name="💰 Wealth", value=f"{total_wealth:,} coins", inline=True)
         embed.add_field(name="🏦 Bank", value=f"{bank:,} coins", inline=True)
-        embed.add_field(name="📊 Transactions", value=f"{transaction_count:,}", inline=True)
+        embed.add_field(name="� Debt", value=f"{server_data.get('debt', {}).get(user_id, 0):,} coins", inline=True)
         
         embed.add_field(name="🏰 Guild", value=guild_name, inline=True)
         embed.add_field(name="🎲 Games Played", value="Coming Soon", inline=True)
@@ -741,14 +709,6 @@ class Economy(commands.Cog):
             if bonuses:
                 embed.add_field(name="🎁 Active Bonuses", value="\n".join(bonuses), inline=False)
             
-            # Add transactions
-            now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
-            robber_tx = {"time": now, "type": "credit", "amount": stolen_amount, "reason": f"Robbed {user.display_name}"}
-            target_tx = {"time": now, "type": "debit", "amount": stolen_amount, "reason": f"Robbed by {interaction.user.display_name}"}
-            
-            server_data.setdefault("transactions", {}).setdefault(robber_id, []).append(robber_tx)
-            server_data.setdefault("transactions", {}).setdefault(target_id, []).append(target_tx)
-            
         else:
             # Failed!
             robber_coins = server_data.get("coins", {}).get(robber_id, 0)
@@ -806,16 +766,6 @@ class Economy(commands.Cog):
             
             embed.add_field(name="Success Rate", value=f"{success_rate*100:.1f}%", inline=True)
             embed.description = "You were caught and had to pay a fine!"
-            
-            # Add transactions
-            actual_fine_paid = fine_amount if total_robber_money >= fine_amount else total_robber_money
-            if actual_fine_paid > 0:
-                now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
-                robber_tx = {"time": now, "type": "debit", "amount": actual_fine_paid, "reason": f"Failed robbery fine to {user.display_name}"}
-                target_tx = {"time": now, "type": "credit", "amount": actual_fine_paid, "reason": f"Robbery protection from {interaction.user.display_name}"}
-                
-                server_data.setdefault("transactions", {}).setdefault(robber_id, []).append(robber_tx)
-                server_data.setdefault("transactions", {}).setdefault(target_id, []).append(target_tx)
         
         # Set cooldown
         server_data.setdefault("cooldowns", {}).setdefault("rob", {})[robber_id] = datetime.utcnow().isoformat()

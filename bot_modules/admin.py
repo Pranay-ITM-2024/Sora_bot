@@ -61,7 +61,7 @@ class Admin(commands.Cog):
         
         embed = discord.Embed(title="⚠️ DANGER: Reset All Data", color=0xe74c3c)
         embed.description = "This will permanently delete ALL economy data including:\n" \
-                           "• User balances\n• Inventories\n• Guilds\n• Transaction history\n• Stock holdings\n\n" \
+                           "• User balances\n• Inventories\n• Guilds\n• Stock holdings\n\n" \
                            "**This action cannot be undone!**"
         embed.set_footer(text="Are you absolutely sure?")
         
@@ -234,12 +234,12 @@ class Admin(commands.Cog):
         # Calculate some basic stats for THIS server
         total_users = len(set(list(server_data.get("coins", {}).keys()) + list(server_data.get("bank", {}).keys())))
         total_coins = sum(server_data.get("coins", {}).values()) + sum(server_data.get("bank", {}).values())
-        total_transactions = sum(len(txs) for txs in server_data.get("transactions", {}).values())
+        total_guilds = len(server_data.get("guilds", {}))
         
         embed = discord.Embed(title="📊 Economy Status (This Server)", color=0x2ecc71)
         embed.add_field(name="👥 Total Users", value=f"{total_users:,}", inline=True)
         embed.add_field(name="💰 Total Coins", value=f"{total_coins:,}", inline=True)
-        embed.add_field(name="📋 Transactions", value=f"{total_transactions:,}", inline=True)
+        embed.add_field(name="🏰 Guilds", value=f"{total_guilds:,}", inline=True)
         embed.add_field(name="🏦 Bank Interest", value="Active", inline=True)
         embed.add_field(name="📈 Stock Market", value="Active", inline=True)
         embed.add_field(name="🎮 Games", value="Active", inline=True)
