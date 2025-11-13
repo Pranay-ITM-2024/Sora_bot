@@ -167,9 +167,10 @@ async def get_trading_bonuses(user_id, data):
     return bonuses
 
 class StockTradingView(discord.ui.View):
-    def __init__(self, user_id, symbol):
+    def __init__(self, user_id, guild_id, symbol):
         super().__init__(timeout=300)
         self.user_id = user_id
+        self.guild_id = guild_id
         self.symbol = symbol
 
     @discord.ui.button(label="Buy Shares", style=discord.ButtonStyle.green, emoji="📈")
@@ -178,7 +179,7 @@ class StockTradingView(discord.ui.View):
             await interaction.response.send_message("❌ This is not your trading interface!", ephemeral=True)
             return
         
-        modal = BuyStockModal(self.symbol)
+        modal = BuyStockModal(self.symbol, self.guild_id)
         await interaction.response.send_modal(modal)
 
     @discord.ui.button(label="Sell Shares", style=discord.ButtonStyle.red, emoji="📉")
@@ -188,13 +189,15 @@ class StockTradingView(discord.ui.View):
             return
         
         data = await load_data()
-        portfolio = data.get("stock_portfolios", {}).get(self.user_id, {})
+        from .database import get_server_data
+        server_data = get_server_data(data, self.guild_id)
+        portfolio = server_data.get("stock_portfolios", {}).get(self.user_id, {})
         
         if self.symbol not in portfolio or portfolio[self.symbol] <= 0:
             await interaction.response.send_message(f"❌ You don't own any {self.symbol} shares!", ephemeral=True)
             return
         
-        modal = SellStockModal(self.symbol)
+        modal = SellStockModal(self.symbol, self.guild_id)
         await interaction.response.send_modal(modal)
 
     @discord.ui.button(label="Refresh Price", style=discord.ButtonStyle.secondary, emoji="�")
@@ -207,6 +210,9 @@ class StockTradingView(discord.ui.View):
 
     async def show_stock_info(self, interaction):
         data = await load_data()
+        from .database import get_server_data
+        server_data = get_server_data(data, self.guild_id)
+        
         stock_info = get_stock_data().get(self.symbol)
         
         if not stock_info:
@@ -214,10 +220,10 @@ class StockTradingView(discord.ui.View):
             return
         
         current_price = calculate_stock_price(self.symbol, data)
-        user_coins = data.get("coins", {}).get(self.user_id, 0)
+        user_coins = server_data.get("coins", {}).get(self.user_id, 0)
         
         # Get user's shares
-        portfolio = data.get("stock_portfolios", {}).get(self.user_id, {})
+        portfolio = server_data.get("stock_portfolios", {}).get(self.user_id, {})
         shares_owned = portfolio.get(self.symbol, 0)
         
         # Calculate position value
@@ -248,7 +254,7 @@ class StockTradingView(discord.ui.View):
         
         # Trading fees
         trading_fee = max(1, int(current_price * 0.01))  # 1% fee, minimum 1 coin
-        bonuses = await get_trading_bonuses(self.user_id, data)
+        bonuses = await get_trading_bonuses(self.user_id, server_data)
         if bonuses["fee_reduction"] > 0:
             reduced_fee = int(trading_fee * (1 - bonuses["fee_reduction"]))
             embed.add_field(name="Trading Fee", value=f"~~{trading_fee}~~ {reduced_fee} coins per share", inline=True)
@@ -260,9 +266,10 @@ class StockTradingView(discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=self)
 
 class BuyStockModal(discord.ui.Modal):
-    def __init__(self, symbol):
+    def __init__(self, symbol, guild_id):
         super().__init__(title=f"Buy {symbol} Shares")
         self.symbol = symbol
+        self.guild_id = guild_id
 
     shares = discord.ui.TextInput(
         label="Number of Shares to Buy",
@@ -283,38 +290,41 @@ class BuyStockModal(discord.ui.Modal):
         
         user_id = str(interaction.user.id)
         data = await load_data()
+        from .database import get_server_data, save_server_data
+        server_data = get_server_data(data, self.guild_id)
         
         current_price = calculate_stock_price(self.symbol, data)
         trading_fee = max(1, int(current_price * 0.01))  # 1% fee per share
         
         # Apply fee reduction bonus
-        bonuses = await get_trading_bonuses(user_id, data)
+        bonuses = await get_trading_bonuses(user_id, server_data)
         if bonuses["fee_reduction"] > 0:
             trading_fee = int(trading_fee * (1 - bonuses["fee_reduction"]))
         
         total_cost = int((current_price * share_count) + (trading_fee * share_count))
         
         # Try to deduct from wallet + bank combined
-        success, message, from_wallet, from_bank = deduct_combined_balance(user_id, total_cost, data)
+        success, message, from_wallet, from_bank = deduct_combined_balance(user_id, total_cost, server_data)
         
         if not success:
             await interaction.response.send_message(message, ephemeral=True)
             return
         
         # Process purchase
-        data.setdefault("stock_portfolios", {}).setdefault(user_id, {})[self.symbol] = data["stock_portfolios"][user_id].get(self.symbol, 0) + share_count
+        server_data.setdefault("stock_portfolios", {}).setdefault(user_id, {})[self.symbol] = server_data["stock_portfolios"][user_id].get(self.symbol, 0) + share_count
         
         # Update stock prices (simulate market impact)
         update_stock_prices(data)
         
         # Add transaction
-        add_transaction(user_id, total_cost, f"Bought {share_count} {self.symbol} shares", data, "debit")
+        add_transaction(user_id, total_cost, f"Bought {share_count} {self.symbol} shares", server_data, "debit")
         
+        save_server_data(data, self.guild_id, server_data)
         await save_data(data, force=True)
         
         # Get new balances
-        new_wallet = data.get("coins", {}).get(user_id, 0)
-        new_bank = data.get("bank", {}).get(user_id, 0)
+        new_wallet = server_data.get("coins", {}).get(user_id, 0)
+        new_bank = server_data.get("bank", {}).get(user_id, 0)
         
         embed = discord.Embed(
             title="✅ Purchase Successful",
@@ -328,16 +338,17 @@ class BuyStockModal(discord.ui.Modal):
         embed.add_field(name="Total Cost", value=f"{total_cost:.2f} coins", inline=True)
         embed.add_field(name="New Balance", value=f"💰 {new_wallet:,} | 🏦 {new_bank:,}", inline=True)
         
-        total_shares = data["stock_portfolios"][user_id][self.symbol]
+        total_shares = server_data["stock_portfolios"][user_id][self.symbol]
         embed.add_field(name="Total Shares Owned", value=f"{total_shares:,} {self.symbol}", inline=False)
         embed.set_footer(text="💡 Use /portfolio to view all your holdings!")
         
         await interaction.response.send_message(embed=embed)
 
 class SellStockModal(discord.ui.Modal):
-    def __init__(self, symbol):
+    def __init__(self, symbol, guild_id):
         super().__init__(title=f"Sell {symbol} Shares")
         self.symbol = symbol
+        self.guild_id = guild_id
 
     shares = discord.ui.TextInput(
         label="Number of Shares to Sell",
@@ -358,8 +369,10 @@ class SellStockModal(discord.ui.Modal):
         
         user_id = str(interaction.user.id)
         data = await load_data()
+        from .database import get_server_data, save_server_data
+        server_data = get_server_data(data, self.guild_id)
         
-        portfolio = data.get("stock_portfolios", {}).get(user_id, {})
+        portfolio = server_data.get("stock_portfolios", {}).get(user_id, {})
         shares_owned = portfolio.get(self.symbol, 0)
         
         if shares_owned < share_count:
@@ -370,7 +383,7 @@ class SellStockModal(discord.ui.Modal):
         trading_fee = max(1, int(current_price * 0.01))  # 1% fee per share
         
         # Apply fee reduction bonus
-        bonuses = await get_trading_bonuses(user_id, data)
+        bonuses = await get_trading_bonuses(user_id, server_data)
         if bonuses["fee_reduction"] > 0:
             trading_fee = int(trading_fee * (1 - bonuses["fee_reduction"]))
         
@@ -384,8 +397,8 @@ class SellStockModal(discord.ui.Modal):
             net_proceeds += bonus_amount
         
         # Process sale
-        user_coins = data.get("coins", {}).get(user_id, 0)
-        data.setdefault("coins", {})[user_id] = user_coins + net_proceeds
+        user_coins = server_data.get("coins", {}).get(user_id, 0)
+        server_data.setdefault("coins", {})[user_id] = user_coins + net_proceeds
         
         # Update portfolio
         portfolio[self.symbol] -= share_count
@@ -396,8 +409,9 @@ class SellStockModal(discord.ui.Modal):
         update_stock_prices(data)
         
         # Add transaction
-        add_transaction(user_id, net_proceeds, f"Sold {share_count} {self.symbol} shares", data, "credit")
+        add_transaction(user_id, net_proceeds, f"Sold {share_count} {self.symbol} shares", server_data, "debit")
         
+        save_server_data(data, self.guild_id, server_data)
         await save_data(data, force=True)
         
         embed = discord.Embed(title="✅ Sale Successful", color=0x27ae60)
@@ -422,9 +436,10 @@ class SellStockModal(discord.ui.Modal):
 class StockSelectView(discord.ui.View):
     """Improved dropdown view for stock selection"""
     
-    def __init__(self, user_id: str, action: str, data: dict):
+    def __init__(self, user_id: str, guild_id: str, action: str, data: dict):
         super().__init__(timeout=60)
         self.user_id = user_id
+        self.guild_id = guild_id
         self.action = action
         self.data = data
         
@@ -475,7 +490,9 @@ class StockSelectView(discord.ui.View):
         
         # For sell action, verify user owns the stock
         if self.action == "sell":
-            portfolio = self.data.get("stock_portfolios", {}).get(self.user_id, {})
+            from .database import get_server_data
+            server_data = get_server_data(self.data, self.guild_id)
+            portfolio = server_data.get("stock_portfolios", {}).get(self.user_id, {})
             
             if symbol not in portfolio or portfolio[symbol] <= 0:
                 stock_name = get_stock_data()[symbol]['name']
@@ -487,7 +504,7 @@ class StockSelectView(discord.ui.View):
                 return
         
         # Create trading view for selected stock
-        view = StockTradingView(self.user_id, symbol)
+        view = StockTradingView(self.user_id, self.guild_id, symbol)
         await view.show_stock_info(interaction)
     
     async def on_timeout(self):
@@ -500,15 +517,19 @@ class Market(commands.Cog):
 
     @app_commands.command(name="stocks", description="View the stock market with live prices!")
     async def stocks(self, interaction: discord.Interaction):
-        data = await load_data()
         user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id)
         
-        # Update prices
+        data = await load_data()
+        from .database import get_server_data, save_server_data
+        server_data = get_server_data(data, guild_id)
+        
+        # Update prices (global market prices)
         update_stock_prices(data)
         await save_data(data)
         
-        user_coins = data.get("coins", {}).get(user_id, 0)
-        portfolio_value = get_portfolio_value(user_id, data)
+        user_coins = server_data.get("coins", {}).get(user_id, 0)
+        portfolio_value = get_portfolio_value(user_id, server_data)
         total_wealth = user_coins + portfolio_value
         
         embed = discord.Embed(title="📈 SORABOT Stock Exchange", description="Live market prices and trading", color=0x2ecc71)
@@ -534,7 +555,7 @@ class Market(commands.Cog):
                     trend_emoji = "📉"
             
             # Check user's position
-            portfolio = data.get("stock_portfolios", {}).get(user_id, {})
+            portfolio = server_data.get("stock_portfolios", {}).get(user_id, {})
             shares = portfolio.get(symbol, 0)
             position_indicator = f" (You own: {shares})" if shares > 0 else ""
             
@@ -550,7 +571,11 @@ class Market(commands.Cog):
     async def buystock(self, interaction: discord.Interaction):
         """Buy stocks with interactive dropdown selection"""
         user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id)
+        
         data = await load_data()
+        from .database import get_server_data, save_server_data
+        server_data = get_server_data(data, guild_id)
         
         # Create informative embed
         embed = discord.Embed(
@@ -560,14 +585,14 @@ class Market(commands.Cog):
         )
         
         # Add user's financial info
-        user_coins = data.get('coins', {}).get(user_id, 0)
-        user_bank = data.get('bank', {}).get(user_id, 0)
+        user_coins = server_data.get('coins', {}).get(user_id, 0)
+        user_bank = server_data.get('bank', {}).get(user_id, 0)
         total_funds = user_coins + user_bank
         
         embed.add_field(name="💰 Available Funds", value=f"🪙 Wallet: {user_coins:,}\n🏦 Bank: {user_bank:,}\n💎 Total: {total_funds:,}", inline=True)
         
         # Show portfolio value if user has stocks
-        portfolio = data.get("stock_portfolios", {}).get(user_id, {})
+        portfolio = server_data.get("stock_portfolios", {}).get(user_id, {})
         if portfolio:
             total_value = 0
             for symbol, shares in portfolio.items():
@@ -584,15 +609,20 @@ class Market(commands.Cog):
         embed.set_footer(text="💡 Click the dropdown below to select a stock!")
         
         # Create view with live stock data
-        view = StockSelectView(user_id, "buy", data)
+        view = StockSelectView(user_id, guild_id, "buy", data)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
     @app_commands.command(name="sellstock", description="Sell shares using an interactive stock selection menu!")
     async def sellstock(self, interaction: discord.Interaction):
         """Sell stocks with interactive dropdown selection"""
         user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id)
+        
         data = await load_data()
-        portfolio = data.get("stock_portfolios", {}).get(user_id, {})
+        from .database import get_server_data, save_server_data
+        server_data = get_server_data(data, guild_id)
+        
+        portfolio = server_data.get("stock_portfolios", {}).get(user_id, {})
         
         # Check if user has any stocks
         owned_stocks = [(symbol, shares) for symbol, shares in portfolio.items() if shares > 0]
@@ -642,15 +672,19 @@ class Market(commands.Cog):
         embed.set_footer(text="💡 Click the dropdown below to select a stock to sell!")
         
         # Create view with live stock data
-        view = StockSelectView(user_id, "sell", data)
+        view = StockSelectView(user_id, guild_id, "sell", data)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
     @app_commands.command(name="portfolio", description="View your stock portfolio with performance!")
     async def portfolio(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
-        data = await load_data()
+        guild_id = str(interaction.guild_id)
         
-        portfolio = data.get("stock_portfolios", {}).get(user_id, {})
+        data = await load_data()
+        from .database import get_server_data, save_server_data
+        server_data = get_server_data(data, guild_id)
+        
+        portfolio = server_data.get("stock_portfolios", {}).get(user_id, {})
         
         if not portfolio:
             embed = discord.Embed(title="📊 Your Portfolio", description="You don't own any stocks yet!", color=0x95a5a6)
@@ -658,7 +692,7 @@ class Market(commands.Cog):
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         
-        user_coins = data.get("coins", {}).get(user_id, 0)
+        user_coins = server_data.get("coins", {}).get(user_id, 0)
         total_value = 0
         positions = []
         
@@ -694,7 +728,7 @@ class Market(commands.Cog):
             embed.add_field(name="🏭 Your Positions", value="\n\n".join(positions), inline=False)
         
         # Show trading bonuses
-        bonuses = await get_trading_bonuses(user_id, data)
+        bonuses = await get_trading_bonuses(user_id, server_data)
         if any(bonuses.values()):
             bonus_text = []
             if bonuses["fee_reduction"] > 0:
