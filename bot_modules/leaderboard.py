@@ -85,9 +85,10 @@ def get_user_stats(user_id, data):
     }
 
 class LeaderboardView(discord.ui.View):
-    def __init__(self, bot):
+    def __init__(self, bot, guild_id):
         super().__init__(timeout=300)
         self.bot = bot
+        self.guild_id = guild_id
 
     @discord.ui.select(
         placeholder="Choose a leaderboard category...",
@@ -106,19 +107,21 @@ class LeaderboardView(discord.ui.View):
 
     async def show_leaderboard(self, interaction, category):
         data = await load_data_compat()
+        from .database import get_server_data
+        server_data = get_server_data(data, self.guild_id)
         
         if category == "💰 Richest Users":
-            await self.show_richest_users(interaction, data)
+            await self.show_richest_users(interaction, server_data)
         elif category == "🏦 Bank Balance":
-            await self.show_bank_leaderboard(interaction, data)
+            await self.show_bank_leaderboard(interaction, server_data)
         elif category == "🎰 Casino Champions":
-            await self.show_casino_leaderboard(interaction, data)
+            await self.show_casino_leaderboard(interaction, server_data)
         elif category == "📈 Stock Tycoons":
-            await self.show_stock_leaderboard(interaction, data)
+            await self.show_stock_leaderboard(interaction, server_data)
         elif category == "🏰 Guild Rankings":
-            await self.show_guild_leaderboard(interaction, data)
+            await self.show_guild_leaderboard(interaction, server_data)
         elif category == "💎 Item Collectors":
-            await self.show_inventory_leaderboard(interaction, data)
+            await self.show_inventory_leaderboard(interaction, server_data)
 
     async def show_richest_users(self, interaction, data):
         # Calculate net worth for all users
@@ -420,7 +423,9 @@ class Leaderboard(commands.Cog):
 
     @app_commands.command(name="leaderboard", description="View comprehensive leaderboards and rankings!")
     async def leaderboard(self, interaction: discord.Interaction):
-        embed = discord.Embed(title="🏆 SORABOT Leaderboards", description="Choose a category to view rankings", color=0xf39c12)
+        guild_id = str(interaction.guild_id)
+        
+        embed = discord.Embed(title="🏆 SORABOT Leaderboards", description="Choose a category to view rankings for THIS server", color=0xf39c12)
         embed.add_field(
             name="🏅 Available Categories",
             value="• 💰 **Richest Users** - Total net worth\n"
@@ -431,17 +436,21 @@ class Leaderboard(commands.Cog):
                   "• 💎 **Item Collectors** - Inventory value",
             inline=False
         )
-        embed.set_footer(text="🎯 Rankings update in real-time based on user activity!")
+        embed.set_footer(text="🎯 Server-specific rankings! Each Discord server has separate leaderboards")
         
-        view = LeaderboardView(self.bot)
+        view = LeaderboardView(self.bot, guild_id)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
     @app_commands.command(name="mystats", description="View your detailed statistics and rankings!")
     async def mystats(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
-        data = await load_data_compat()
+        guild_id = str(interaction.guild_id)
         
-        stats = get_user_stats(user_id, data)
+        data = await load_data_compat()
+        from .database import get_server_data
+        server_data = get_server_data(data, guild_id)
+        
+        stats = get_user_stats(user_id, server_data)
         
         embed = discord.Embed(title=f"📊 {interaction.user.display_name}'s Statistics", color=0x3498db)
         
@@ -486,18 +495,22 @@ class Leaderboard(commands.Cog):
 
     @app_commands.command(name="richest", description="Quick view of the richest users!")
     async def richest(self, interaction: discord.Interaction):
-        data = await load_data_compat()
+        guild_id = str(interaction.guild_id)
         
-        # Calculate top 5 richest users
+        data = await load_data_compat()
+        from .database import get_server_data
+        server_data = get_server_data(data, guild_id)
+        
+        # Calculate top 5 richest users FOR THIS SERVER
         user_net_worths = []
         all_users = set()
         
         for section in ["coins", "bank", "inventories", "stock_portfolios"]:
-            if section in data:
-                all_users.update(data[section].keys())
+            if section in server_data:
+                all_users.update(server_data[section].keys())
         
         for user_id in all_users:
-            net_worth = calculate_net_worth(user_id, data)
+            net_worth = calculate_net_worth(user_id, server_data)
             if net_worth > 0:
                 user_net_worths.append((user_id, net_worth))
         
