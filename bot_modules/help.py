@@ -67,6 +67,21 @@ class HelpCog(commands.Cog):
         )
         
         embed.add_field(
+            name="💳 Loan & Credit System",
+            value="`/creditlimit` - Check your available credit limit\n"
+                  "`/takeloan <amount>` - Borrow money (max: wealth + 10%)\n"
+                  "`/payloan [amount]` - Pay EMI or full loan\n"
+                  "`/loanstatus` - View detailed loan report\n"
+                  "**How it works:**\n"
+                  "• Credit limit = Your wealth + 10%\n"
+                  "• Pay in 4 weekly EMIs\n"
+                  "• Miss payment = 15% interest added\n"
+                  "• If loan reaches 1.5x original, converts to debt!\n"
+                  "• Debt is auto-deducted from future earnings",
+            inline=False
+        )
+        
+        embed.add_field(
             name="🏰 Guild System", 
             value="`/guild_create` - Create your own guild\n"
                   "`/guild_join` - Request to join (owner approval required)\n"

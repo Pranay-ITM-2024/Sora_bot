@@ -143,7 +143,7 @@ async def on_ready():
         logging.error(f'❌ Data system initialization failed: {e}')
     
     # Load all bot_modules
-    modules = ["economy", "casino", "inventory", "shop", "guild", "market", "leaderboard", "admin", "help", "heist"]
+    modules = ["economy", "casino", "inventory", "shop", "guild", "market", "leaderboard", "admin", "help", "heist", "loan"]
     
     for module_name in modules:
         try:
@@ -174,6 +174,10 @@ async def on_ready():
     if not sunday_unlock_task.is_running():
         sunday_unlock_task.start()
         print('🔓 Sunday unlock task started')
+    
+    if not loan_check_task.is_running():
+        loan_check_task.start()
+        print('💳 Loan check task started')
     
     # Update web server status
     try:
@@ -528,6 +532,81 @@ async def sunday_unlock_task():
         
     except Exception as e:
         logging.error(f"Sunday unlock task failed: {e}")
+
+@tasks.loop(hours=6)
+async def loan_check_task():
+    """Check for overdue loans and apply interest/debt conversion"""
+    try:
+        now = datetime.datetime.utcnow()
+        data = await data_manager.load_data()
+        
+        # Process each Discord server independently
+        for guild_id, server_data in data.get("servers", {}).items():
+            loans = server_data.get("loans", {})
+            loans_to_remove = []
+            
+            for user_id, loan in loans.items():
+                next_payment_date = loan.get("next_payment_date")
+                if not next_payment_date:
+                    continue
+                
+                next_date = datetime.fromisoformat(next_payment_date)
+                
+                # Check if payment is overdue
+                if now > next_date:
+                    days_overdue = (now - next_date).days
+                    
+                    # Apply interest for each week overdue (only once per week)
+                    weeks_overdue = days_overdue // 7
+                    current_missed = loan.get("missed_payments", 0)
+                    
+                    if weeks_overdue > current_missed:
+                        # Apply interest for newly missed payments
+                        new_missed = weeks_overdue - current_missed
+                        interest_rate = loan.get("interest_rate", 0.15)
+                        
+                        for _ in range(new_missed):
+                            outstanding = loan.get("outstanding", 0)
+                            interest = int(outstanding * interest_rate)
+                            loan["outstanding"] = outstanding + interest
+                            loan["missed_payments"] = loan.get("missed_payments", 0) + 1
+                            
+                            logging.warning(
+                                f"⚠️ [{guild_id}] User {user_id} missed payment! "
+                                f"Interest added: {interest:,} coins. "
+                                f"New outstanding: {loan['outstanding']:,} coins"
+                            )
+                        
+                        # Check if loan should be converted to debt
+                        original = loan.get("original_amount", 0)
+                        max_multiplier = loan.get("max_debt_multiplier", 1.5)
+                        debt_threshold = original * max_multiplier
+                        
+                        if loan["outstanding"] >= debt_threshold:
+                            # Convert to debt
+                            debt_amount = loan["outstanding"]
+                            server_data.setdefault("debt", {})[user_id] = \
+                                server_data.get("debt", {}).get(user_id, 0) + debt_amount
+                            
+                            loans_to_remove.append(user_id)
+                            
+                            logging.error(
+                                f"💳 [{guild_id}] User {user_id} loan converted to DEBT! "
+                                f"Amount: {debt_amount:,} coins (reached {max_multiplier}x threshold)"
+                            )
+            
+            # Remove loans that were converted to debt
+            for user_id in loans_to_remove:
+                del loans[user_id]
+            
+            if loans_to_remove:
+                server_data["loans"] = loans
+                save_server_data(data, guild_id, server_data)
+        
+        await data_manager.save_data(data)
+        
+    except Exception as e:
+        logging.error(f"Loan check task failed: {e}")
 
 # Admin commands for Firebase management
 @bot.command(name='sync')

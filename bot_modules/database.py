@@ -77,6 +77,8 @@ class DataManager:
             "consumable_effects": {},
             "loot_tables": {},
             "shop_items": {},
+            "loans": {},
+            "debt": {},
             "config": {
                 "min_bet": 10,
                 "max_bet": 1000000,
