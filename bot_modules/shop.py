@@ -147,8 +147,13 @@ class PurchaseView(discord.ui.View):
             return
         
         # Purchase the item - add to inventory
-        server_data.setdefault("inventories", {}).setdefault(self.user_id, {})[self.item_key] = \
-            server_data["inventories"][self.user_id].get(self.item_key, 0) + 1
+        if "inventories" not in server_data:
+            server_data["inventories"] = {}
+        if self.user_id not in server_data["inventories"]:
+            server_data["inventories"][self.user_id] = {}
+        
+        current_count = server_data["inventories"][self.user_id].get(self.item_key, 0)
+        server_data["inventories"][self.user_id][self.item_key] = current_count + 1
         
         save_server_data(data, self.guild_id, server_data)
         await save_data(data)
