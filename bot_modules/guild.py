@@ -386,8 +386,8 @@ class WithdrawModal(discord.ui.Modal, title="💸 Guild Bank Withdrawal"):
             description=f"Successfully withdrew **{withdraw_amount:,}** coins from **{self.guild_name}** guild bank!",
             color=0x00ff00
         )
-        embed.add_field(name="Your New Balance", value=f"{data['coins'][user_id]:,} coins", inline=True)
-        embed.add_field(name="Guild Bank Balance", value=f"{data['guilds'][self.guild_name]['bank']:,} coins", inline=True)
+        embed.add_field(name="Your New Balance", value=f"{server_data['coins'][user_id]:,} coins", inline=True)
+        embed.add_field(name="Guild Bank Balance", value=f"{server_data['guilds'][self.guild_name]['bank']:,} coins", inline=True)
         
         await interaction.response.send_message(embed=embed)
 

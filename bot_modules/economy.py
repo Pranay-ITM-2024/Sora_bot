@@ -592,8 +592,22 @@ class Economy(commands.Cog):
         # Get equipped items
         equipped = server_data.get("equipped", {}).get(user_id, {})
         
-        # Get guild info (placeholder)
-        guild_name = "No Guild"
+        # Get guild info
+        from .guild import get_user_guild
+        guild_name = get_user_guild(user_id, server_data)
+        if not guild_name:
+            guild_name = "No Guild"
+        
+        # Get casino stats
+        casino_stats = server_data.get("casino_stats", {}).get(user_id, {})
+        games_played = casino_stats.get("games_played", 0)
+        total_won = casino_stats.get("total_won", 0)
+        total_lost = casino_stats.get("total_lost", 0)
+        net_profit = total_won - total_lost
+        
+        # Get loan info
+        loans = server_data.get("loans", {}).get(user_id, {})
+        active_loan = loans.get("amount", 0) > 0
         
         embed = discord.Embed(title=f"👤 {interaction.user.display_name}'s Profile", color=0x9b59b6)
         embed.set_thumbnail(url=interaction.user.display_avatar.url)
@@ -602,13 +616,28 @@ class Economy(commands.Cog):
         if debt_paid > 0:
             embed.description = f"✅ {debt_message}"
         
-        embed.add_field(name="💰 Wealth", value=f"{total_wealth:,} coins", inline=True)
+        embed.add_field(name="💰 Wallet", value=f"{coins:,} coins", inline=True)
         embed.add_field(name="🏦 Bank", value=f"{bank:,} coins", inline=True)
-        embed.add_field(name="� Debt", value=f"{server_data.get('debt', {}).get(user_id, 0):,} coins", inline=True)
+        embed.add_field(name="💎 Total Wealth", value=f"{total_wealth:,} coins", inline=True)
         
-        embed.add_field(name="🏰 Guild", value=guild_name, inline=True)
-        embed.add_field(name="🎲 Games Played", value="Coming Soon", inline=True)
-        embed.add_field(name="🏆 Rank", value="#??? (TBD)", inline=True)
+        # Show debt/loan if exists
+        user_debt = server_data.get("debt", {}).get(user_id, 0)
+        if user_debt > 0:
+            embed.add_field(name="⚠️ Debt", value=f"{user_debt:,} coins", inline=True)
+        if active_loan:
+            loan_amount = loans.get("amount", 0)
+            embed.add_field(name="💳 Active Loan", value=f"{loan_amount:,} coins", inline=True)
+        
+        embed.add_field(name="�� Guild", value=guild_name, inline=True)
+        
+        # Casino stats
+        if games_played > 0:
+            profit_emoji = "📈" if net_profit >= 0 else "📉"
+            embed.add_field(
+                name="🎰 Casino Stats",
+                value=f"Games: {games_played}\n{profit_emoji} Net: {net_profit:+,}",
+                inline=True
+            )
         
         if equipped:
             equipped_text = []
