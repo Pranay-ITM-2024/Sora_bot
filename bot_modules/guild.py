@@ -5,37 +5,38 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
-from .database import load_data, save_data
+from .database import load_data, save_data, get_server_data, save_server_data
 
-def get_user_guild(user_id, data):
-    """Get the guild a user belongs to"""
+def get_user_guild(user_id, server_data):
+    """Get the guild a user belongs to (within a Discord server)"""
     user_id = str(user_id)
-    for guild_name, members in data.get("guild_members", {}).items():
+    for guild_name, members in server_data.get("guild_members", {}).items():
         if user_id in members:
             return guild_name
     return None
 
-def get_guild_role(user_id, guild_name, data):
-    """Get user's role in guild"""
+def get_guild_role(user_id, guild_name, server_data):
+    """Get user's role in guild (within a Discord server)"""
     user_id = str(user_id)
-    guild_data = data.get("guilds", {}).get(guild_name, {})
+    guild_data = server_data.get("guilds", {}).get(guild_name, {})
     
     if user_id == guild_data.get("owner"):
         return "Owner"
     elif user_id in guild_data.get("moderators", []):
         return "Moderator"
-    elif user_id in data.get("guild_members", {}).get(guild_name, []):
+    elif user_id in server_data.get("guild_members", {}).get(guild_name, []):
         return "Member"
     return None
 
 class GuildJoinApprovalView(discord.ui.View):
     """View for guild owner to approve/deny join requests"""
-    def __init__(self, owner_id, applicant_id, applicant_name, guild_name):
+    def __init__(self, owner_id, applicant_id, applicant_name, guild_name, discord_guild_id):
         super().__init__(timeout=86400)  # 24 hour timeout
         self.owner_id = str(owner_id)
         self.applicant_id = str(applicant_id)
         self.applicant_name = applicant_name
         self.guild_name = guild_name
+        self.discord_guild_id = str(discord_guild_id)
     
     @discord.ui.button(label="Approve", style=discord.ButtonStyle.success, emoji="✅")
     async def approve_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -45,9 +46,10 @@ class GuildJoinApprovalView(discord.ui.View):
         
         try:
             data = await load_data()
+            server_data = get_server_data(data, self.discord_guild_id)
             
             # Check if applicant is still guildless
-            current_guild = get_user_guild(self.applicant_id, data)
+            current_guild = get_user_guild(self.applicant_id, server_data)
             if current_guild:
                 await interaction.response.edit_message(
                     content=f"❌ **{self.applicant_name}** has already joined another guild!",
@@ -56,7 +58,8 @@ class GuildJoinApprovalView(discord.ui.View):
                 return
             
             # Add to guild
-            data.setdefault("guild_members", {}).setdefault(self.guild_name, []).append(self.applicant_id)
+            server_data.setdefault("guild_members", {}).setdefault(self.guild_name, []).append(self.applicant_id)
+            save_server_data(data, self.discord_guild_id, server_data)
             await save_data(data, force=True)
             
             # Notify owner
@@ -105,8 +108,9 @@ class GuildJoinApprovalView(discord.ui.View):
             pass  # Couldn't DM, oh well
 
 class GuildJoinSelect(discord.ui.Select):
-    def __init__(self, user_id, bot):
+    def __init__(self, user_id, discord_guild_id, bot):
         self.user_id = user_id
+        self.discord_guild_id = str(discord_guild_id)
         self.bot = bot
         
         # This will be populated when the view is created
@@ -126,15 +130,16 @@ class GuildJoinSelect(discord.ui.Select):
         
         try:
             data = await load_data()
+            server_data = get_server_data(data, self.discord_guild_id)
             
             # Double-check user isn't in a guild
-            current_guild = get_user_guild(self.user_id, data)
+            current_guild = get_user_guild(self.user_id, server_data)
             if current_guild:
                 await interaction.response.send_message(f"❌ You're already in guild **{current_guild}**!", ephemeral=True)
                 return
             
             # Get guild owner
-            guild_data = data.get("guilds", {}).get(guild_name, {})
+            guild_data = server_data.get("guilds", {}).get(guild_name, {})
             owner_id = guild_data.get("owner")
             
             if not owner_id:
@@ -151,10 +156,10 @@ class GuildJoinSelect(discord.ui.Select):
                     color=0xff9500
                 )
                 embed.add_field(name="Applicant", value=f"<@{self.user_id}>", inline=True)
-                embed.add_field(name="Current Members", value=str(len(data.get("guild_members", {}).get(guild_name, []))), inline=True)
+                embed.add_field(name="Current Members", value=str(len(server_data.get("guild_members", {}).get(guild_name, []))), inline=True)
                 embed.set_footer(text="You have 24 hours to approve or deny this request.")
                 
-                approval_view = GuildJoinApprovalView(owner_id, self.user_id, interaction.user.name, guild_name)
+                approval_view = GuildJoinApprovalView(owner_id, self.user_id, interaction.user.name, guild_name, self.discord_guild_id)
                 
                 await owner.send(embed=embed, view=approval_view)
                 
@@ -178,13 +183,14 @@ class GuildJoinSelect(discord.ui.Select):
             await interaction.response.send_message(f"❌ An error occurred: {e}", ephemeral=True)
 
 class GuildJoinView(discord.ui.View):
-    def __init__(self, user_id, bot):
+    def __init__(self, user_id, discord_guild_id, bot):
         super().__init__(timeout=180)
         self.user_id = str(user_id)
+        self.discord_guild_id = str(discord_guild_id)
         self.bot = bot
         
         # Add the select menu - will be populated when showing the view
-        self.select_menu = GuildJoinSelect(self.user_id, bot)
+        self.select_menu = GuildJoinSelect(self.user_id, discord_guild_id, bot)
         self.add_item(self.select_menu)
     
     async def on_timeout(self):
@@ -193,30 +199,32 @@ class GuildJoinView(discord.ui.View):
             item.disabled = True
 
 class GuildBankView(discord.ui.View):
-    def __init__(self, guild_name, user_id):
+    def __init__(self, guild_name, user_id, discord_guild_id):
         super().__init__(timeout=300)
         self.guild_name = guild_name
         self.user_id = user_id
+        self.discord_guild_id = str(discord_guild_id)
 
     @discord.ui.button(label="💰 Deposit", style=discord.ButtonStyle.green, emoji="💰")
     async def deposit_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("❌ This isn't your guild interface!", ephemeral=True)
             return
-        await interaction.response.send_modal(DepositModal(self.guild_name))
+        await interaction.response.send_modal(DepositModal(self.guild_name, self.discord_guild_id))
 
     @discord.ui.button(label="💸 Withdraw", style=discord.ButtonStyle.red, emoji="💸")
     async def withdraw_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("❌ This isn't your guild interface!", ephemeral=True)
             return
-        await interaction.response.send_modal(WithdrawModal(self.guild_name))
+        await interaction.response.send_modal(WithdrawModal(self.guild_name, self.discord_guild_id))
 
     @discord.ui.button(label="ℹ️ Guild Info", style=discord.ButtonStyle.secondary, emoji="ℹ️")
     async def info_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         data = await load_data()
-        guild_info = data.get("guilds", {}).get(self.guild_name, {})
-        members = data.get("guild_members", {}).get(self.guild_name, [])
+        server_data = get_server_data(data, self.discord_guild_id)
+        guild_info = server_data.get("guilds", {}).get(self.guild_name, {})
+        members = server_data.get("guild_members", {}).get(self.guild_name, [])
         
         embed = discord.Embed(
             title=f"🏰 {self.guild_name} Guild Info",
@@ -231,9 +239,10 @@ class GuildBankView(discord.ui.View):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 class DepositModal(discord.ui.Modal, title="💰 Guild Bank Deposit"):
-    def __init__(self, guild_name):
+    def __init__(self, guild_name, discord_guild_id):
         super().__init__()
         self.guild_name = guild_name
+        self.discord_guild_id = str(discord_guild_id)
 
     amount = discord.ui.TextInput(
         label="Amount to Deposit",
@@ -252,10 +261,11 @@ class DepositModal(discord.ui.Modal, title="💰 Guild Bank Deposit"):
             return
 
         data = await load_data()
+        server_data = get_server_data(data, self.discord_guild_id)
         user_id = str(interaction.user.id)
         
         # Check if user has enough coins
-        user_coins = data.get("coins", {}).get(user_id, 0)
+        user_coins = server_data.get("coins", {}).get(user_id, 0)
         if user_coins < deposit_amount:
             await interaction.response.send_message(
                 f"❌ Insufficient funds! You have {user_coins:,} coins but tried to deposit {deposit_amount:,}.",
@@ -264,34 +274,35 @@ class DepositModal(discord.ui.Modal, title="💰 Guild Bank Deposit"):
             return
 
         # Check if user is in guild
-        user_guild = get_user_guild(user_id, data)
+        user_guild = get_user_guild(user_id, server_data)
         if user_guild != self.guild_name:
             await interaction.response.send_message("❌ You're not a member of this guild!", ephemeral=True)
             return
 
         # Process deposit
-        data["coins"][user_id] -= deposit_amount
+        server_data["coins"][user_id] -= deposit_amount
         
-        if "guilds" not in data:
-            data["guilds"] = {}
-        if self.guild_name not in data["guilds"]:
-            data["guilds"][self.guild_name] = {"bank": 0, "owner": user_id}
+        if "guilds" not in server_data:
+            server_data["guilds"] = {}
+        if self.guild_name not in server_data["guilds"]:
+            server_data["guilds"][self.guild_name] = {"bank": 0, "owner": user_id}
             
-        data["guilds"][self.guild_name]["bank"] = data["guilds"][self.guild_name].get("bank", 0) + deposit_amount
+        server_data["guilds"][self.guild_name]["bank"] = server_data["guilds"][self.guild_name].get("bank", 0) + deposit_amount
         
         # Add to transactions
-        if "transactions" not in data:
-            data["transactions"] = {}
-        if user_id not in data["transactions"]:
-            data["transactions"][user_id] = []
+        if "transactions" not in server_data:
+            server_data["transactions"] = {}
+        if user_id not in server_data["transactions"]:
+            server_data["transactions"][user_id] = []
         
-        data["transactions"][user_id].append({
+        server_data["transactions"][user_id].append({
             "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"),
             "type": "debit",
             "amount": deposit_amount,
             "reason": f"Guild bank deposit to {self.guild_name}"
         })
         
+        save_server_data(data, self.discord_guild_id, server_data)
         await save_data(data)
 
         embed = discord.Embed(
@@ -299,15 +310,16 @@ class DepositModal(discord.ui.Modal, title="💰 Guild Bank Deposit"):
             description=f"Successfully deposited **{deposit_amount:,}** coins to **{self.guild_name}** guild bank!",
             color=0x00ff00
         )
-        embed.add_field(name="Your New Balance", value=f"{data['coins'][user_id]:,} coins", inline=True)
-        embed.add_field(name="Guild Bank Balance", value=f"{data['guilds'][self.guild_name]['bank']:,} coins", inline=True)
+        embed.add_field(name="Your New Balance", value=f"{server_data['coins'][user_id]:,} coins", inline=True)
+        embed.add_field(name="Guild Bank Balance", value=f"{server_data['guilds'][self.guild_name]['bank']:,} coins", inline=True)
         
         await interaction.response.send_message(embed=embed)
 
 class WithdrawModal(discord.ui.Modal, title="💸 Guild Bank Withdrawal"):
-    def __init__(self, guild_name):
+    def __init__(self, guild_name, discord_guild_id):
         super().__init__()
         self.guild_name = guild_name
+        self.discord_guild_id = str(discord_guild_id)
 
     amount = discord.ui.TextInput(
         label="Amount to Withdraw",
@@ -326,16 +338,17 @@ class WithdrawModal(discord.ui.Modal, title="💸 Guild Bank Withdrawal"):
             return
 
         data = await load_data()
+        server_data = get_server_data(data, self.discord_guild_id)
         user_id = str(interaction.user.id)
         
         # Check if user is in guild
-        user_guild = get_user_guild(user_id, data)
+        user_guild = get_user_guild(user_id, server_data)
         if user_guild != self.guild_name:
             await interaction.response.send_message("❌ You're not a member of this guild!", ephemeral=True)
             return
         
         # Check if guild bank is locked (Saturday contributions)
-        withdrawal_locks = data.get("withdrawal_locks", {})
+        withdrawal_locks = server_data.get("withdrawal_locks", {})
         if self.guild_name in withdrawal_locks and withdrawal_locks[self.guild_name].get("locked", False):
             await interaction.response.send_message(
                 "🔒 **Guild Bank Locked!**\n\n"
@@ -346,7 +359,7 @@ class WithdrawModal(discord.ui.Modal, title="💸 Guild Bank Withdrawal"):
             return
 
         # Check guild bank balance
-        guild_bank = data.get("guilds", {}).get(self.guild_name, {}).get("bank", 0)
+        guild_bank = server_data.get("guilds", {}).get(self.guild_name, {}).get("bank", 0)
         if guild_bank < withdraw_amount:
             await interaction.response.send_message(
                 f"❌ Insufficient guild funds! Guild bank has {guild_bank:,} coins but you tried to withdraw {withdraw_amount:,}.",
@@ -355,25 +368,26 @@ class WithdrawModal(discord.ui.Modal, title="💸 Guild Bank Withdrawal"):
             return
 
         # Process withdrawal
-        data["guilds"][self.guild_name]["bank"] -= withdraw_amount
+        server_data["guilds"][self.guild_name]["bank"] -= withdraw_amount
         
-        if "coins" not in data:
-            data["coins"] = {}
-        data["coins"][user_id] = data["coins"].get(user_id, 0) + withdraw_amount
+        if "coins" not in server_data:
+            server_data["coins"] = {}
+        server_data["coins"][user_id] = server_data["coins"].get(user_id, 0) + withdraw_amount
         
         # Add to transactions
-        if "transactions" not in data:
-            data["transactions"] = {}
-        if user_id not in data["transactions"]:
-            data["transactions"][user_id] = []
+        if "transactions" not in server_data:
+            server_data["transactions"] = {}
+        if user_id not in server_data["transactions"]:
+            server_data["transactions"][user_id] = []
         
-        data["transactions"][user_id].append({
+        server_data["transactions"][user_id].append({
             "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"),
             "type": "credit",
             "amount": withdraw_amount,
             "reason": f"Guild bank withdrawal from {self.guild_name}"
         })
         
+        save_server_data(data, self.discord_guild_id, server_data)
         await save_data(data)
 
         embed = discord.Embed(
@@ -394,6 +408,7 @@ class Guild(commands.Cog):
     @app_commands.describe(name="Name of the guild to create")
     async def guild_create(self, interaction: discord.Interaction, name: str):
         user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id)
         
         if len(name) < 3 or len(name) > 32:
             await interaction.response.send_message("❌ Guild name must be between 3 and 32 characters!", ephemeral=True)
@@ -405,32 +420,34 @@ class Guild(commands.Cog):
             return
         
         data = await load_data()
+        server_data = get_server_data(data, guild_id)
         
         # Check if user is already in a guild
-        current_guild = get_user_guild(user_id, data)
+        current_guild = get_user_guild(user_id, server_data)
         if current_guild:
             await interaction.response.send_message(f"❌ You're already in guild **{current_guild}**! Use `/guild_leave` first.", ephemeral=True)
             return
         
         # Check if guild name exists
-        if name in data.get("guilds", {}):
+        if name in server_data.get("guilds", {}):
             await interaction.response.send_message(f"❌ Guild **{name}** already exists!", ephemeral=True)
             return
         
         # Create guild
-        if "guilds" not in data:
-            data["guilds"] = {}
-        if "guild_members" not in data:
-            data["guild_members"] = {}
+        if "guilds" not in server_data:
+            server_data["guilds"] = {}
+        if "guild_members" not in server_data:
+            server_data["guild_members"] = {}
 
-        data["guilds"][name] = {
+        server_data["guilds"][name] = {
             "owner": user_id,
             "bank": 0,
             "created": datetime.now().isoformat(),
             "moderators": []
         }
-        data["guild_members"][name] = [user_id]
+        server_data["guild_members"][name] = [user_id]
 
+        save_server_data(data, guild_id, server_data)
         await save_data(data)
 
         embed = discord.Embed(
@@ -448,16 +465,19 @@ class Guild(commands.Cog):
     @app_commands.command(name="guild_join", description="Join an existing guild!")
     async def guild_join(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id)
+        
         data = await load_data()
+        server_data = get_server_data(data, guild_id)
         
         # Check if user is already in a guild
-        current_guild = get_user_guild(user_id, data)
+        current_guild = get_user_guild(user_id, server_data)
         if current_guild:
             await interaction.response.send_message(f"❌ You're already in guild **{current_guild}**! Use `/guild_leave` first.", ephemeral=True)
             return
 
         # Get all available guilds
-        guilds = data.get("guilds", {})
+        guilds = server_data.get("guilds", {})
         if not guilds:
             await interaction.response.send_message("❌ No guilds exist yet! Create one with `/guild_create`.", ephemeral=True)
             return
@@ -474,7 +494,7 @@ class Guild(commands.Cog):
         select_options = []
         
         for guild_name, guild_info in guilds.items():
-            members = data.get("guild_members", {}).get(guild_name, [])
+            members = server_data.get("guild_members", {}).get(guild_name, [])
             bank = guild_info.get("bank", 0)
             owner_id = guild_info.get("owner", "Unknown")
             
@@ -497,7 +517,7 @@ class Guild(commands.Cog):
                 embed.add_field(name="And more...", value=f"+{len(guild_list) - 10} more guilds available in dropdown", inline=False)
         
         # Create view and populate select menu (pass bot instance)
-        view = GuildJoinView(user_id, self.bot)
+        view = GuildJoinView(user_id, guild_id, self.bot)
         view.select_menu.options = select_options
         
         embed.set_footer(text="📨 A join request will be sent to the guild owner for approval!")
@@ -507,21 +527,25 @@ class Guild(commands.Cog):
     @app_commands.command(name="guild_leave", description="Leave your current guild!")
     async def guild_leave(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id)
+        
         data = await load_data()
+        server_data = get_server_data(data, guild_id)
         
         # Find user's guild
-        user_guild = get_user_guild(user_id, data)
+        user_guild = get_user_guild(user_id, server_data)
         if not user_guild:
             await interaction.response.send_message("❌ You're not in any guild!", ephemeral=True)
             return
 
         # Check if user is owner
-        if data.get("guilds", {}).get(user_guild, {}).get("owner") == user_id:
+        if server_data.get("guilds", {}).get(user_guild, {}).get("owner") == user_id:
             await interaction.response.send_message("❌ You can't leave your own guild! Transfer ownership first or disband the guild.", ephemeral=True)
             return
 
         # Leave guild
-        data["guild_members"][user_guild].remove(user_id)
+        server_data["guild_members"][user_guild].remove(user_id)
+        save_server_data(data, guild_id, server_data)
         await save_data(data)
 
         embed = discord.Embed(
@@ -535,17 +559,20 @@ class Guild(commands.Cog):
     @app_commands.command(name="guild_bank", description="Access your guild's bank!")
     async def guild_bank(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id)
+        
         data = await load_data()
+        server_data = get_server_data(data, guild_id)
         
         # Find user's guild
-        user_guild = get_user_guild(user_id, data)
+        user_guild = get_user_guild(user_id, server_data)
         if not user_guild:
             await interaction.response.send_message("❌ You're not in any guild!", ephemeral=True)
             return
 
-        guild_info = data.get("guilds", {}).get(user_guild, {})
+        guild_info = server_data.get("guilds", {}).get(user_guild, {})
         guild_bank = guild_info.get("bank", 0)
-        member_count = len(data.get("guild_members", {}).get(user_guild, []))
+        member_count = len(server_data.get("guild_members", {}).get(user_guild, []))
 
         embed = discord.Embed(
             title=f"🏦 {user_guild} Guild Bank",
@@ -558,22 +585,25 @@ class Guild(commands.Cog):
         # Add interest bonus info
         embed.add_field(name="📈 Guild Benefits", value="• +5% bank interest\n• 🏆 TOP GUILD BONUS: Extra +5% interest (10% total)!\n• Shared guild treasury\n• Member collaboration\n• Use buttons below to manage funds", inline=False)
 
-        view = GuildBankView(user_guild, interaction.user.id)
+        view = GuildBankView(user_guild, interaction.user.id, guild_id)
         await interaction.response.send_message(embed=embed, view=view)
 
     @app_commands.command(name="guild_members", description="View your guild's member list!")
     async def guild_members(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id)
+        
         data = await load_data()
+        server_data = get_server_data(data, guild_id)
         
         # Find user's guild
-        user_guild = get_user_guild(user_id, data)
+        user_guild = get_user_guild(user_id, server_data)
         if not user_guild:
             await interaction.response.send_message("❌ You're not in any guild!", ephemeral=True)
             return
 
-        members = data.get("guild_members", {}).get(user_guild, [])
-        guild_info = data.get("guilds", {}).get(user_guild, {})
+        members = server_data.get("guild_members", {}).get(user_guild, [])
+        guild_info = server_data.get("guilds", {}).get(user_guild, {})
 
         embed = discord.Embed(
             title=f"👥 {user_guild} Members",
@@ -598,8 +628,11 @@ class Guild(commands.Cog):
 
     @app_commands.command(name="guild_top", description="View the richest guilds leaderboard!")
     async def guild_top(self, interaction: discord.Interaction):
+        guild_id = str(interaction.guild_id)
+        
         data = await load_data()
-        guilds = data.get("guilds", {})
+        server_data = get_server_data(data, guild_id)
+        guilds = server_data.get("guilds", {})
         
         if not guilds:
             await interaction.response.send_message("❌ No guilds exist yet!", ephemeral=True)
@@ -610,13 +643,14 @@ class Guild(commands.Cog):
 
         embed = discord.Embed(
             title="🏆 Top Guilds by Bank Balance",
+            description="Rankings for this server",
             color=0xffd700
         )
 
         description = []
         for i, (guild_name, guild_data) in enumerate(sorted_guilds[:10], 1):
             bank_balance = guild_data.get("bank", 0)
-            member_count = len(data.get("guild_members", {}).get(guild_name, []))
+            member_count = len(server_data.get("guild_members", {}).get(guild_name, []))
             
             try:
                 owner = await self.bot.fetch_user(int(guild_data.get("owner", 0)))
@@ -635,16 +669,19 @@ class Guild(commands.Cog):
     @app_commands.command(name="guild_info", description="View detailed information about your guild!")
     async def guild_info(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id)
+        
         data = await load_data()
+        server_data = get_server_data(data, guild_id)
         
         # Find user's guild
-        user_guild = get_user_guild(user_id, data)
+        user_guild = get_user_guild(user_id, server_data)
         if not user_guild:
             await interaction.response.send_message("❌ You're not in any guild!", ephemeral=True)
             return
 
-        guild_info = data.get("guilds", {}).get(user_guild, {})
-        members = data.get("guild_members", {}).get(user_guild, [])
+        guild_info = server_data.get("guilds", {}).get(user_guild, {})
+        members = server_data.get("guild_members", {}).get(user_guild, [])
         
         embed = discord.Embed(
             title=f"ℹ️ {user_guild} Guild Information",
@@ -661,7 +698,7 @@ class Guild(commands.Cog):
         embed.add_field(name="👥 Members", value=str(len(members)), inline=True)
         embed.add_field(name="💰 Bank Balance", value=f"{guild_info.get('bank', 0):,} coins", inline=True)
         embed.add_field(name="📅 Created", value=guild_info.get('created', 'Unknown')[:10] if guild_info.get('created') else 'Unknown', inline=True)
-        embed.add_field(name="🎯 Your Role", value=get_guild_role(user_id, user_guild, data) or "Member", inline=True)
+        embed.add_field(name="🎯 Your Role", value=get_guild_role(user_id, user_guild, server_data) or "Member", inline=True)
         embed.add_field(name="📈 Guild Benefits", value="• +5% bank interest for all members\n• 🏆 TOP GUILD BONUS: Extra +5% interest (10% total)!\n• Shared treasury for cooperation\n• Member networking and collaboration\n• Leaderboard recognition", inline=False)
 
         await interaction.response.send_message(embed=embed)
@@ -679,23 +716,26 @@ class Guild(commands.Cog):
         
         inviter_id = str(interaction.user.id)
         invitee_id = str(user.id)
+        guild_id = str(interaction.guild_id)
+        
         data = await load_data()
+        server_data = get_server_data(data, guild_id)
         
         # Check if inviter is in a guild
-        inviter_guild = get_user_guild(inviter_id, data)
+        inviter_guild = get_user_guild(inviter_id, server_data)
         if not inviter_guild:
             await interaction.response.send_message("❌ You're not in any guild! Create one with `/guild_create`", ephemeral=True)
             return
         
         # Check if invitee is already in a guild
-        invitee_guild = get_user_guild(invitee_id, data)
+        invitee_guild = get_user_guild(invitee_id, server_data)
         if invitee_guild:
             await interaction.response.send_message(f"❌ {user.display_name} is already in a guild!", ephemeral=True)
             return
         
         # Check if inviter has permission (owner or officer)
-        guild_info = data.get("guilds", {}).get(inviter_guild, {})
-        inviter_role = get_guild_role(inviter_id, inviter_guild, data)
+        guild_info = server_data.get("guilds", {}).get(inviter_guild, {})
+        inviter_role = get_guild_role(inviter_id, inviter_guild, server_data)
         
         if inviter_role not in ["Owner", "Officer"]:
             await interaction.response.send_message("❌ Only guild owners and officers can invite members!", ephemeral=True)
@@ -708,10 +748,10 @@ class Guild(commands.Cog):
             color=0x00ff00
         )
         
-        members_count = len(data.get("guild_members", {}).get(inviter_guild, []))
+        members_count = len(server_data.get("guild_members", {}).get(inviter_guild, []))
         guild_bank = guild_info.get("bank", 0)
         
-        embed.add_field(name="👑 Guild Owner", value=get_guild_owner_name(inviter_guild, data, self.bot), inline=True)
+        embed.add_field(name="👑 Guild Owner", value=get_guild_owner_name(inviter_guild, server_data, self.bot), inline=True)
         embed.add_field(name="👥 Members", value=str(members_count), inline=True)
         embed.add_field(name="💰 Bank", value=f"{guild_bank:,} coins", inline=True)
         embed.add_field(
@@ -721,16 +761,17 @@ class Guild(commands.Cog):
         )
         embed.set_footer(text="Accept or decline the invitation below")
         
-        view = GuildInviteView(invitee_id, inviter_guild, inviter_id)
+        view = GuildInviteView(invitee_id, inviter_guild, inviter_id, guild_id)
         await interaction.response.send_message(f"{user.mention}", embed=embed, view=view)
 
 class GuildInviteView(discord.ui.View):
     """View for accepting/declining guild invites"""
-    def __init__(self, invitee_id, guild_name, inviter_id):
+    def __init__(self, invitee_id, guild_name, inviter_id, discord_guild_id):
         super().__init__(timeout=300)
         self.invitee_id = invitee_id
         self.guild_name = guild_name
         self.inviter_id = inviter_id
+        self.discord_guild_id = str(discord_guild_id)
     
     @discord.ui.button(label="Accept", style=discord.ButtonStyle.success, emoji="✅")
     async def accept_invite(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -739,14 +780,16 @@ class GuildInviteView(discord.ui.View):
             return
         
         data = await load_data()
+        server_data = get_server_data(data, self.discord_guild_id)
         
         # Check if user is already in a guild
-        if get_user_guild(self.invitee_id, data):
+        if get_user_guild(self.invitee_id, server_data):
             await interaction.response.send_message("❌ You're already in a guild!", ephemeral=True)
             return
         
         # Add user to guild
-        data.setdefault("guild_members", {}).setdefault(self.guild_name, []).append(self.invitee_id)
+        server_data.setdefault("guild_members", {}).setdefault(self.guild_name, []).append(self.invitee_id)
+        save_server_data(data, self.discord_guild_id, server_data)
         await save_data(data, force=True)
         
         embed = discord.Embed(
