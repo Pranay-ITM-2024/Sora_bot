@@ -8,10 +8,10 @@ from datetime import datetime, timedelta
 import random
 from .database import load_data, save_data
 
-def deduct_debt(user_id, amount, data):
+def deduct_debt(user_id, amount, server_data):
     """Deduct outstanding debt from earnings. Returns (remaining_amount, debt_paid)"""
     user_id = str(user_id)
-    debt = data.get("debt", {}).get(user_id, 0)
+    debt = server_data.get("debt", {}).get(user_id, 0)
     
     if debt <= 0:
         return amount, 0
@@ -20,29 +20,29 @@ def deduct_debt(user_id, amount, data):
         # Can pay off all debt
         remaining = amount - debt
         debt_paid = debt
-        data.setdefault("debt", {})[user_id] = 0
+        server_data.setdefault("debt", {})[user_id] = 0
     else:
         # Partial debt payment
         remaining = 0
         debt_paid = amount
-        data.setdefault("debt", {})[user_id] = debt - amount
+        server_data.setdefault("debt", {})[user_id] = debt - amount
     
     return remaining, debt_paid
 
-def auto_deduct_debt_from_balance(user_id, data):
+def auto_deduct_debt_from_balance(user_id, server_data):
     """
     Automatically deduct debt from user's wallet and bank balance.
     Called whenever checking balance or loading user data.
     Returns (debt_paid, message) tuple.
     """
     user_id = str(user_id)
-    debt = data.get("debt", {}).get(user_id, 0)
+    debt = server_data.get("debt", {}).get(user_id, 0)
     
     if debt <= 0:
         return 0, None
     
-    wallet = data.get("coins", {}).get(user_id, 0)
-    bank = data.get("bank", {}).get(user_id, 0)
+    wallet = server_data.get("coins", {}).get(user_id, 0)
+    bank = server_data.get("bank", {}).get(user_id, 0)
     total_money = wallet + bank
     
     if total_money <= 0:
@@ -53,23 +53,23 @@ def auto_deduct_debt_from_balance(user_id, data):
     
     # Deduct from wallet first, then bank
     if wallet >= debt_to_pay:
-        data.setdefault("coins", {})[user_id] = wallet - debt_to_pay
+        server_data.setdefault("coins", {})[user_id] = wallet - debt_to_pay
         remaining_wallet = wallet - debt_to_pay
         remaining_bank = bank
     else:
         # Take all from wallet, rest from bank
         remaining_from_bank = debt_to_pay - wallet
-        data.setdefault("coins", {})[user_id] = 0
-        data.setdefault("bank", {})[user_id] = bank - remaining_from_bank
+        server_data.setdefault("coins", {})[user_id] = 0
+        server_data.setdefault("bank", {})[user_id] = bank - remaining_from_bank
         remaining_wallet = 0
         remaining_bank = bank - remaining_from_bank
     
     # Update debt
     new_debt = debt - debt_to_pay
     if new_debt > 0:
-        data.setdefault("debt", {})[user_id] = new_debt
+        server_data.setdefault("debt", {})[user_id] = new_debt
     else:
-        data.setdefault("debt", {})[user_id] = 0
+        server_data.setdefault("debt", {})[user_id] = 0
     
     # Create message
     message = (
@@ -82,14 +82,14 @@ def auto_deduct_debt_from_balance(user_id, data):
     
     return debt_to_pay, message
 
-def deduct_combined_balance(user_id, amount, data):
+def deduct_combined_balance(user_id, amount, server_data):
     """
     Deduct from wallet first, then bank if wallet is insufficient.
     Returns (success: bool, message: str, from_wallet: int, from_bank: int)
     """
     user_id = str(user_id)
-    wallet = data.get("coins", {}).get(user_id, 0)
-    bank = data.get("bank", {}).get(user_id, 0)
+    wallet = server_data.get("coins", {}).get(user_id, 0)
+    bank = server_data.get("bank", {}).get(user_id, 0)
     total = wallet + bank
     
     if total < amount:
@@ -97,13 +97,13 @@ def deduct_combined_balance(user_id, amount, data):
     
     # Deduct from wallet first
     if wallet >= amount:
-        data.setdefault("coins", {})[user_id] = wallet - amount
+        server_data.setdefault("coins", {})[user_id] = wallet - amount
         return True, f"💰 Paid {amount:,} from wallet", amount, 0
     else:
         # Take all from wallet, rest from bank
         remaining_needed = amount - wallet
-        data.setdefault("coins", {})[user_id] = 0
-        data.setdefault("bank", {})[user_id] = bank - remaining_needed
+        server_data.setdefault("coins", {})[user_id] = 0
+        server_data.setdefault("bank", {})[user_id] = bank - remaining_needed
         return True, f"💰 Paid {wallet:,} from wallet + 🏦 {remaining_needed:,} from bank", wallet, remaining_needed
 
 def get_rarity_color(rarity):

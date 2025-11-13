@@ -315,8 +315,10 @@ class CategoryView(discord.ui.View):
             await interaction.response.send_message("❌ Not your shop!", ephemeral=True)
             return
         
+        from .database import get_server_data
         data = await load_data()
-        user_coins = data.get("coins", {}).get(self.user_id, 0)
+        server_data = get_server_data(data, str(self.guild_id))
+        user_coins = server_data.get("coins", {}).get(self.user_id, 0)
         
         embed = discord.Embed(
             title="🛒 SORABOT SHOP",
