@@ -417,8 +417,9 @@ class RatStats:
 
 class RatRaceLobby:
     """Manages a single race instance"""
-    def __init__(self, host_id):
+    def __init__(self, host_id, guild_id):
         self.host_id = host_id
+        self.guild_id = guild_id
         self.race_id = f"{host_id}_{datetime.utcnow().timestamp()}"
         self.rats = self._generate_rats()
         self.bets = {}  # {user_id: {"rat_id": int, "amount": int, "user_name": str}}
@@ -547,9 +548,10 @@ class RatRaceStartView(discord.ui.View):
     @discord.ui.button(label="Start New Race", style=discord.ButtonStyle.primary, emoji="🏁")
     async def start_race(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id)
         
         # Create new lobby
-        lobby = RatRaceLobby(user_id)
+        lobby = RatRaceLobby(user_id, guild_id)
         active_race_lobbies[lobby.race_id] = lobby
         
         # Show betting interface
@@ -605,13 +607,29 @@ class RatRaceStartView(discord.ui.View):
     
     async def _start_race_sequence(self, interaction, lobby):
         """Run the live race sequence"""
+        from .database import get_server_data, save_server_data
+        
         lobby.started = True
         
-        # Deduct all bets (from wallet + bank)
+        # Deduct all bets (from wallet + bank) - use server_data
         data = await load_data()
+        server_data = get_server_data(data, lobby.guild_id)
+        
         for user_id, bet_info in lobby.bets.items():
-            deduct_bet(user_id, bet_info["amount"], data)
-            add_transaction(user_id, bet_info["amount"], "Rat race bet", data, "debit")
+            bet_amount = bet_info["amount"]
+            
+            # Deduct from wallet first, then bank
+            wallet = server_data.get("coins", {}).get(user_id, 0)
+            bank = server_data.get("bank", {}).get(user_id, 0)
+            
+            if wallet >= bet_amount:
+                server_data.setdefault("coins", {})[user_id] = wallet - bet_amount
+            else:
+                remaining = bet_amount - wallet
+                server_data.setdefault("coins", {})[user_id] = 0
+                server_data.setdefault("bank", {})[user_id] = bank - remaining
+        
+        save_server_data(data, lobby.guild_id, server_data)
         await save_data(data, force=True)
         
         # Starting embed
@@ -659,16 +677,31 @@ class RatRaceStartView(discord.ui.View):
     
     async def _show_results(self, interaction, lobby):
         """Show final results and distribute winnings"""
+        from .database import get_server_data, save_server_data
+        
         data = await load_data()
+        server_data = get_server_data(data, lobby.guild_id)
         payouts = lobby.calculate_payouts()
         
-        # Distribute winnings
+        # Distribute winnings - use server_data
         for user_id, payout_info in payouts.items():
             if payout_info["winnings"] > 0:
-                current_coins = data.get("coins", {}).get(user_id, 0)
-                data.setdefault("coins", {})[user_id] = current_coins + payout_info["winnings"]
-                add_transaction(user_id, payout_info["winnings"], f"Rat race win (Place {payout_info['placement']})", data, "credit")
+                current_coins = server_data.get("coins", {}).get(user_id, 0)
+                server_data.setdefault("coins", {})[user_id] = current_coins + payout_info["winnings"]
         
+        # Track casino stats
+        for user_id, payout_info in payouts.items():
+            bet_info = lobby.bets[user_id]
+            stats = server_data.setdefault("casino_stats", {}).setdefault(user_id, {
+                "ratrace_played": 0, "ratrace_won": 0, "total_wagered": 0, "total_won": 0
+            })
+            stats["ratrace_played"] = stats.get("ratrace_played", 0) + 1
+            if payout_info["winnings"] > 0:
+                stats["ratrace_won"] = stats.get("ratrace_won", 0) + 1
+            stats["total_wagered"] = stats.get("total_wagered", 0) + bet_info["amount"]
+            stats["total_won"] = stats.get("total_won", 0) + payout_info["winnings"]
+        
+        save_server_data(data, lobby.guild_id, server_data)
         await save_data(data, force=True)
         
         # Create results embed
@@ -769,6 +802,8 @@ class BetAmountModal(discord.ui.Modal, title="Place Your Bet"):
         self.add_item(self.bet_input)
     
     async def on_submit(self, interaction: discord.Interaction):
+        from .database import get_server_data
+        
         try:
             bet_amount = int(self.bet_input.value)
         except ValueError:
@@ -780,10 +815,15 @@ class BetAmountModal(discord.ui.Modal, title="Place Your Bet"):
             return
         
         user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id)
         data = await load_data()
+        server_data = get_server_data(data, guild_id)
         
-        # Check total balance (wallet + bank)
-        wallet, bank, total = get_total_balance(user_id, data)
+        # Check total balance (wallet + bank) - use server_data
+        wallet = server_data.get("coins", {}).get(user_id, 0)
+        bank = server_data.get("bank", {}).get(user_id, 0)
+        total = wallet + bank
+        
         if total < bet_amount:
             await interaction.response.send_message(
                 f"❌ Insufficient funds!\n💰 Wallet: {wallet:,} | 🏦 Bank: {bank:,}\n**Need:** {bet_amount:,} coins",
