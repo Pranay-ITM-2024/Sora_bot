@@ -21,6 +21,8 @@ from dotenv import load_dotenv
 
 # Import Firebase-only data manager
 from firebase_data_manager import get_firebase_manager
+# Import multi-server helpers
+from bot_modules.database import get_server_data, save_server_data
 
 # Load environment variables
 load_dotenv('.env')
@@ -292,45 +294,50 @@ async def interest_task():
     """Calculate interest on bank accounts with bonus for top guild"""
     try:
         data = await data_manager.load_data()
-        bank_accounts = data.get("bank", {})
         config = data.get("config", {})
         interest_rate = config.get("interest_rate", 0.001)
         
-        # Find the top guild by total bank balance
-        guilds = data.get("guilds", {})
-        guild_members = data.get("guild_members", {})
-        top_guild = None
-        top_guild_balance = 0
-        top_guild_members = set()
-        
-        for guild_name, guild_data in guilds.items():
-            guild_bank = guild_data.get("bank", 0)
-            if guild_bank > top_guild_balance:
-                top_guild_balance = guild_bank
-                top_guild = guild_name
-                top_guild_members = set(guild_members.get(guild_name, []))
-        
-        # Calculate interest for each user
-        for user_id, balance in bank_accounts.items():
-            if balance > 0:
-                # Base interest
-                interest = int(balance * interest_rate)
-                
-                # Add 5% bonus if user is in top guild
-                if user_id in top_guild_members:
-                    bonus = int(balance * 0.05)  # 5% bonus
-                    interest += bonus
-                
-                if interest > 0:
-                    bank_accounts[user_id] = balance + interest
-        
-        data["bank"] = bank_accounts
-        data["_meta"]["last_interest_ts"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
-        if top_guild:
-            data["_meta"]["last_top_guild"] = top_guild
+        # Process each Discord server independently
+        for guild_id, server_data in data.get("servers", {}).items():
+            bank_accounts = server_data.get("bank", {})
+            
+            # Find the top guild by total bank balance for this server
+            guilds = server_data.get("guilds", {})
+            guild_members = server_data.get("guild_members", {})
+            top_guild = None
+            top_guild_balance = 0
+            top_guild_members = set()
+            
+            for guild_name, guild_data in guilds.items():
+                guild_bank = guild_data.get("bank", 0)
+                if guild_bank > top_guild_balance:
+                    top_guild_balance = guild_bank
+                    top_guild = guild_name
+                    top_guild_members = set(guild_members.get(guild_name, []))
+            
+            # Calculate interest for each user on this server
+            for user_id, balance in bank_accounts.items():
+                if balance > 0:
+                    # Base interest
+                    interest = int(balance * interest_rate)
+                    
+                    # Add 5% bonus if user is in top guild
+                    if user_id in top_guild_members:
+                        bonus = int(balance * 0.05)  # 5% bonus
+                        interest += bonus
+                    
+                    if interest > 0:
+                        bank_accounts[user_id] = balance + interest
+            
+            server_data["bank"] = bank_accounts
+            server_data.setdefault("_meta", {})["last_interest_ts"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            if top_guild:
+                server_data["_meta"]["last_top_guild"] = top_guild
+            
+            save_server_data(data, guild_id, server_data)
+            logging.debug(f"💰 [{guild_id}] Interest calculated (Top guild: {top_guild or 'None'})")
         
         await data_manager.save_data(data)
-        logging.debug(f"💰 Interest calculated (Top guild: {top_guild or 'None'})")
         
     except Exception as e:
         logging.error(f"Interest calculation failed: {e}")
@@ -347,78 +354,89 @@ async def saturday_contribution_task():
         
         data = await data_manager.load_data()
         
-        # Check if already ran today
+        # Check if already ran today (global check)
         last_contribution = data.get("_meta", {}).get("last_saturday_contribution")
         if last_contribution:
             last_date = datetime.datetime.fromisoformat(last_contribution).date()
             if last_date == now.date():
                 return  # Already ran today
         
-        logging.info("💰 Saturday guild contribution starting...")
+        logging.info("💰 Saturday guild contribution starting (all servers)...")
         
-        guild_members = data.get("guild_members", {})
-        guilds = data.get("guilds", {})
-        contributions = data.setdefault("saturday_contributions", {})
-        withdrawal_locks = data.setdefault("withdrawal_locks", {})
+        total_contributed_all = 0
+        servers_processed = 0
         
-        total_contributed = 0
-        
-        # Process each guild
-        for guild_name, members in guild_members.items():
-            guild_data = guilds.get(guild_name, {})
-            guild_contributions = []
+        # Process each Discord server
+        for guild_id, server_data in data.get("servers", {}).items():
+            guild_members = server_data.get("guild_members", {})
+            guilds = server_data.get("guilds", {})
+            contributions = server_data.setdefault("saturday_contributions", {})
+            withdrawal_locks = server_data.setdefault("withdrawal_locks", {})
             
-            for user_id in members:
-                # Calculate 75% of total worth
-                wallet = data.get("coins", {}).get(user_id, 0)
-                bank = data.get("bank", {}).get(user_id, 0)
-                total_worth = wallet + bank
-                
-                if total_worth <= 0:
-                    continue
-                
-                contribution = int(total_worth * 0.75)
-                
-                # Take from bank first, then wallet
-                if bank >= contribution:
-                    data.setdefault("bank", {})[user_id] = bank - contribution
-                else:
-                    data.setdefault("bank", {})[user_id] = 0
-                    remaining = contribution - bank
-                    data.setdefault("coins", {})[user_id] = wallet - remaining
-                
-                # Add to guild bank
-                guild_data["bank"] = guild_data.get("bank", 0) + contribution
-                
-                # Track contribution
-                contributions.setdefault(guild_name, {})[user_id] = {
-                    "amount": contribution,
-                    "timestamp": now.isoformat()
-                }
-                
-                guild_contributions.append(contribution)
-                total_contributed += contribution
+            total_contributed = 0
             
-            # Lock guild bank withdrawals until Sunday night or heist attempt
-            if guild_contributions:
-                withdrawal_locks[guild_name] = {
-                    "locked": True,
-                    "locked_since": now.isoformat(),
-                    "heist_attempted": False
-                }
+            # Process each in-game guild in this Discord server
+            for guild_name, members in guild_members.items():
+                guild_data = guilds.get(guild_name, {})
+                guild_contributions = []
                 
-                guilds[guild_name] = guild_data
-                logging.info(f"🔒 {guild_name} bank locked with {sum(guild_contributions):,} coins from {len(guild_contributions)} members")
+                for user_id in members:
+                    # Calculate 75% of total worth
+                    wallet = server_data.get("coins", {}).get(user_id, 0)
+                    bank = server_data.get("bank", {}).get(user_id, 0)
+                    total_worth = wallet + bank
+                    
+                    if total_worth <= 0:
+                        continue
+                    
+                    contribution = int(total_worth * 0.75)
+                    
+                    # Take from bank first, then wallet
+                    if bank >= contribution:
+                        server_data.setdefault("bank", {})[user_id] = bank - contribution
+                    else:
+                        server_data.setdefault("bank", {})[user_id] = 0
+                        remaining = contribution - bank
+                        server_data.setdefault("coins", {})[user_id] = wallet - remaining
+                    
+                    # Add to guild bank
+                    guild_data["bank"] = guild_data.get("bank", 0) + contribution
+                    
+                    # Track contribution
+                    contributions.setdefault(guild_name, {})[user_id] = {
+                        "amount": contribution,
+                        "timestamp": now.isoformat()
+                    }
+                    
+                    guild_contributions.append(contribution)
+                    total_contributed += contribution
+                
+                # Lock guild bank withdrawals until Sunday night or heist attempt
+                if guild_contributions:
+                    withdrawal_locks[guild_name] = {
+                        "locked": True,
+                        "locked_since": now.isoformat(),
+                        "heist_attempted": False
+                    }
+                    
+                    guilds[guild_name] = guild_data
+                    logging.info(f"🔒 [{guild_id}] {guild_name} bank locked with {sum(guild_contributions):,} coins from {len(guild_contributions)} members")
+            
+            # Save updated server data
+            server_data["guilds"] = guilds
+            server_data["saturday_contributions"] = contributions
+            server_data["withdrawal_locks"] = withdrawal_locks
+            save_server_data(data, guild_id, server_data)
+            
+            total_contributed_all += total_contributed
+            servers_processed += 1
         
-        # Save updated data
-        data["guilds"] = guilds
-        data["saturday_contributions"] = contributions
-        data["withdrawal_locks"] = withdrawal_locks
+        # Mark as completed today (global marker)
         data.setdefault("_meta", {})["last_saturday_contribution"] = now.isoformat()
         
         await data_manager.save_data(data, force=True)
         
-        logging.info(f"✅ Saturday contributions complete: {total_contributed:,} coins contributed across all guilds")
+        logging.info(f"✅ Saturday contributions complete: {total_contributed_all:,} coins contributed across {servers_processed} servers")
         
     except Exception as e:
         logging.error(f"Saturday contribution task failed: {e}")
@@ -434,21 +452,29 @@ async def sunday_unlock_task():
             return
         
         data = await data_manager.load_data()
-        withdrawal_locks = data.get("withdrawal_locks", {})
         
-        unlocked_count = 0
+        total_unlocked = 0
         
-        for guild_name, lock_data in withdrawal_locks.items():
-            if lock_data.get("locked"):
-                lock_data["locked"] = False
-                lock_data["unlocked_at"] = now.isoformat()
-                unlocked_count += 1
-                logging.info(f"🔓 Unlocked {guild_name} guild bank")
+        # Process each Discord server independently
+        for guild_id, server_data in data.get("servers", {}).items():
+            withdrawal_locks = server_data.get("withdrawal_locks", {})
+            unlocked_count = 0
+            
+            for guild_name, lock_data in withdrawal_locks.items():
+                if lock_data.get("locked"):
+                    lock_data["locked"] = False
+                    lock_data["unlocked_at"] = now.isoformat()
+                    unlocked_count += 1
+                    logging.info(f"🔓 [{guild_id}] Unlocked {guild_name} guild bank")
+            
+            if unlocked_count > 0:
+                server_data["withdrawal_locks"] = withdrawal_locks
+                save_server_data(data, guild_id, server_data)
+                total_unlocked += unlocked_count
         
-        if unlocked_count > 0:
-            data["withdrawal_locks"] = withdrawal_locks
+        if total_unlocked > 0:
             await data_manager.save_data(data, force=True)
-            logging.info(f"✅ Sunday unlock complete: {unlocked_count} guilds unlocked")
+            logging.info(f"✅ Sunday unlock complete: {total_unlocked} guilds unlocked across all servers")
         
     except Exception as e:
         logging.error(f"Sunday unlock task failed: {e}")
