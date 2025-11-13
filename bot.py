@@ -373,7 +373,26 @@ async def interest_task():
                             logging.info(f"🏆 [{guild_id}] {guild_name} (TOP GUILD) earned {interest:,} coins (5% base + 5% bonus)")
                         
                         if interest > 0:
-                            guild_data["bank"] = guild_bank + interest
+                            # Split interest proportionally among contributors
+                            contributions = guild_data.get("contributions", {})
+                            total_contributions = sum(contributions.values())
+                            
+                            if contributions and total_contributions > 0:
+                                # Distribute interest to contributors based on their share
+                                for contributor_id, contribution_amount in contributions.items():
+                                    share = contribution_amount / total_contributions
+                                    user_interest = int(interest * share)
+                                    
+                                    if user_interest > 0:
+                                        # Add interest to user's wallet
+                                        current_wallet = server_data.get("coins", {}).get(contributor_id, 0)
+                                        server_data.setdefault("coins", {})[contributor_id] = current_wallet + user_interest
+                                
+                                logging.info(f"💰 [{guild_id}] {guild_name} distributed {interest:,} coins to {len(contributions)} contributors")
+                            else:
+                                # No contributions tracked, add to guild bank (legacy behavior)
+                                guild_data["bank"] = guild_bank + interest
+                            
                             total_guild_interest += interest
                 
                 server_data["guilds"] = guilds

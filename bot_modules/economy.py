@@ -505,7 +505,7 @@ class Economy(commands.Cog):
         embed.add_field(name="💰 Wallet", value=f"{coins:,} coins", inline=True)
         embed.add_field(name="🏦 Bank", value=f"{bank:,} coins", inline=True)
         embed.add_field(name="💎 Total", value=f"{coins + bank:,} coins", inline=True)
-        embed.add_field(name="📈 Interest", value="0.1% per 10 minutes", inline=True)
+        embed.add_field(name="📈 Interest", value="0.5% per 24 hours", inline=True)
         embed.set_footer(text="Use the buttons below to deposit or withdraw coins")
         
         view = BankView(user_id, guild_id)

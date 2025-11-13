@@ -22,23 +22,25 @@ class HelpCog(commands.Cog):
                   "`/pay` - Send coins to another user\n"
                   "`/request` - Request coins from user\n"
                   "`/rob` - Attempt to rob user (1hr cooldown)\n"
-                  "`/bank` - Deposit/withdraw from bank\n"
+                  "`/bank` - Deposit/withdraw (0.5% interest per 24hrs)\n"
                   "`/profile` - View detailed user statistics", 
             inline=False
         )
         
         embed.add_field(
             name="🎰 Casino Games", 
-            value="`/casino` - Interactive casino hub with:\n"
-                  "• **Roulette** - Spin the wheel! Bet on colors/numbers\n"
-                  "• **Slots** - 3-reel slot machine (2x-50x payouts)\n"
-                  "• **Coinflip** - 50/50 chance, double your bet\n"
-                  "• **Blackjack** - Classic card game vs dealer\n"
-                  "• **Rat Race** - 🏁 MULTIPLAYER live racing!\n"
+            value="`/slots <bet>` - Mathematical 5-reel slot machine\n"
+                  "  → 94.8% RTP (provably fair)\n"
+                  "  → Scatter bonuses & free spins\n"
+                  "  → Jackpot announcements (auto-delete 5min)\n"
+                  "`/coinflip <bet> <heads/tails>` - Double or nothing\n"
+                  "`/blackjack <bet>` - Classic 21 vs dealer\n"
+                  "`/roulette <bet> <choice>` - Spin the wheel\n"
+                  "`/ratrace` - 🏁 MULTIPLAYER live racing!\n"
                   "  → Random rat stats, live updates, 30s betting\n"
                   "  → Multiple players bet on same race\n"
                   "  → 5x/2x/1.5x payouts for top 3!\n"
-                  "*Item effects boost your gambling luck!*", 
+                  "*All games work with wallet + bank balance!*", 
             inline=False
         )
         
@@ -87,10 +89,14 @@ class HelpCog(commands.Cog):
                   "`/guild_join` - Request to join (owner approval required)\n"
                   "`/guild_leave` - Leave current guild\n"
                   "`/guild_invite` - Invite users (owner/officer)\n"
+                  "`/guild_transfer` - Transfer ownership (dropdown selection)\n"
                   "`/guild_bank` - Deposit/withdraw from guild bank\n"
+                  "`/gshare` - View contribution shares & interest splits\n"
                   "`/guild_info` - View guild details\n"
                   "`/guild_members` - List all members\n"
                   "`/heist` - 🏦 Sunday heists! Rob other guilds\n"
+                  "**Interest System:** 5% weekly base + 5% for TOP guild\n"
+                  "**Contribution Tracking:** Interest splits proportionally\n"
                   "**Saturday:** 75% of wealth auto-contributed to guild\n"
                   "**Withdrawal Lock:** Until Sunday 8PM or heist attempt", 
             inline=False

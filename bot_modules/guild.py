@@ -285,7 +285,14 @@ class DepositModal(discord.ui.Modal, title="💰 Guild Bank Deposit"):
         if "guilds" not in server_data:
             server_data["guilds"] = {}
         if self.guild_name not in server_data["guilds"]:
-            server_data["guilds"][self.guild_name] = {"bank": 0, "owner": user_id}
+            server_data["guilds"][self.guild_name] = {"bank": 0, "owner": user_id, "contributions": {}}
+        
+        # Track individual contribution
+        if "contributions" not in server_data["guilds"][self.guild_name]:
+            server_data["guilds"][self.guild_name]["contributions"] = {}
+        
+        contributions = server_data["guilds"][self.guild_name]["contributions"]
+        contributions[user_id] = contributions.get(user_id, 0) + deposit_amount
             
         server_data["guilds"][self.guild_name]["bank"] = server_data["guilds"][self.guild_name].get("bank", 0) + deposit_amount
         
@@ -356,6 +363,16 @@ class WithdrawModal(discord.ui.Modal, title="💸 Guild Bank Withdrawal"):
 
         # Process withdrawal
         server_data["guilds"][self.guild_name]["bank"] -= withdraw_amount
+        
+        # Reduce user's contribution proportionally
+        if "contributions" in server_data["guilds"][self.guild_name]:
+            contributions = server_data["guilds"][self.guild_name]["contributions"]
+            user_contribution = contributions.get(user_id, 0)
+            
+            if user_contribution > 0:
+                # Reduce contribution by withdrawal amount
+                new_contribution = max(0, user_contribution - withdraw_amount)
+                contributions[user_id] = new_contribution
         
         if "coins" not in server_data:
             server_data["coins"] = {}
@@ -850,6 +867,88 @@ class GuildInviteView(discord.ui.View):
         embed.set_footer(text="Select a member from the dropdown below")
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+    @app_commands.command(name="gshare", description="View guild bank contributions and interest shares")
+    async def gshare(self, interaction: discord.Interaction):
+        user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id)
+        
+        data = await load_data()
+        server_data = get_server_data(data, guild_id)
+        
+        # Find user's guild
+        user_guild = get_user_guild(user_id, server_data)
+        if not user_guild:
+            await interaction.response.send_message("❌ You're not in any guild!", ephemeral=True)
+            return
+        
+        guild_info = server_data.get("guilds", {}).get(user_guild, {})
+        contributions = guild_info.get("contributions", {})
+        guild_bank = guild_info.get("bank", 0)
+        
+        if not contributions or sum(contributions.values()) == 0:
+            await interaction.response.send_message(
+                "❌ No contributions tracked yet! Deposit to the guild bank to start tracking contributions.",
+                ephemeral=True
+            )
+            return
+        
+        # Calculate total contributions and percentages
+        total_contributions = sum(contributions.values())
+        
+        embed = discord.Embed(
+            title=f"💰 {user_guild} - Contribution Shares",
+            description=f"Guild members earn interest proportional to their contribution share.\n\n**Guild Bank:** {guild_bank:,} coins\n**Total Contributions:** {total_contributions:,} coins",
+            color=0xf1c40f
+        )
+        
+        # Sort contributors by amount (highest first)
+        sorted_contributors = sorted(contributions.items(), key=lambda x: x[1], reverse=True)
+        
+        # Build contributor list
+        contributor_list = []
+        for i, (contributor_id, amount) in enumerate(sorted_contributors[:15], 1):  # Limit to top 15
+            try:
+                member = await self.bot.fetch_user(int(contributor_id))
+                name = member.display_name if member else f"User {contributor_id}"
+            except:
+                name = f"User {contributor_id}"
+            
+            percentage = (amount / total_contributions) * 100
+            
+            # Calculate weekly interest share (5% base + 5% if top guild)
+            # Assuming base 5% weekly interest
+            base_interest_share = int((guild_bank * 0.05) * (amount / total_contributions))
+            bonus_interest_share = int((guild_bank * 0.05) * (amount / total_contributions))  # If top guild
+            
+            emoji = "👑" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
+            
+            contributor_list.append(
+                f"{emoji} **{name}**\n"
+                f"   💰 Contributed: {amount:,} ({percentage:.1f}%)\n"
+                f"   📈 Interest: {base_interest_share:,} base | +{bonus_interest_share:,} if TOP"
+            )
+        
+        embed.add_field(
+            name="📊 Contributors & Interest Shares",
+            value="\n\n".join(contributor_list) if contributor_list else "No contributors",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="ℹ️ How It Works",
+            value=(
+                "• Your contribution share = Your contributions ÷ Total contributions\n"
+                "• Weekly interest is split proportionally based on contribution %\n"
+                "• Base: 5% weekly | TOP GUILD: +5% bonus\n"
+                "• Interest is added to the guild bank and distributed to individual wallets"
+            ),
+            inline=False
+        )
+        
+        embed.set_footer(text="💡 Use /guild_bank to deposit and increase your share!")
+        
+        await interaction.response.send_message(embed=embed)
 
 class GuildTransferView(discord.ui.View):
     """View for transferring guild ownership"""
