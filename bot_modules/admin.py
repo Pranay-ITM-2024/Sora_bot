@@ -247,5 +247,81 @@ class Admin(commands.Cog):
         embed.set_footer(text="Per-server economy system | Each Discord server has separate data")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
+    @app_commands.command(name="setdaily", description="Set the daily reward amount (admin only).")
+    @app_commands.describe(amount="The new daily reward amount")
+    async def setdaily(self, interaction: discord.Interaction, amount: int):
+        # Check if user has admin permissions
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ You don't have permission to use this command!", ephemeral=True)
+            return
+        
+        if amount < 0:
+            await interaction.response.send_message("❌ Amount must be positive!", ephemeral=True)
+            return
+        
+        guild_id = str(interaction.guild_id)
+        data = await load_data()
+        from .database import get_server_data, save_server_data
+        server_data = get_server_data(data, guild_id)
+        
+        # Store the daily reward amount in server settings
+        if "_settings" not in server_data:
+            server_data["_settings"] = {}
+        
+        old_amount = server_data["_settings"].get("daily_reward", 150)
+        server_data["_settings"]["daily_reward"] = amount
+        
+        save_server_data(data, guild_id, server_data)
+        await save_data(data, force=True)
+        
+        embed = discord.Embed(
+            title="✅ Daily Reward Updated",
+            description=f"Daily reward has been changed from **{old_amount:,}** to **{amount:,}** coins!",
+            color=0x00ff00
+        )
+        embed.add_field(name="Previous Amount", value=f"{old_amount:,} coins", inline=True)
+        embed.add_field(name="New Amount", value=f"{amount:,} coins", inline=True)
+        embed.set_footer(text="All users will now receive this amount when using /daily")
+        
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="setweekly", description="Set the weekly reward amount (admin only).")
+    @app_commands.describe(amount="The new weekly reward amount")
+    async def setweekly(self, interaction: discord.Interaction, amount: int):
+        # Check if user has admin permissions
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ You don't have permission to use this command!", ephemeral=True)
+            return
+        
+        if amount < 0:
+            await interaction.response.send_message("❌ Amount must be positive!", ephemeral=True)
+            return
+        
+        guild_id = str(interaction.guild_id)
+        data = await load_data()
+        from .database import get_server_data, save_server_data
+        server_data = get_server_data(data, guild_id)
+        
+        # Store the weekly reward amount in server settings
+        if "_settings" not in server_data:
+            server_data["_settings"] = {}
+        
+        old_amount = server_data["_settings"].get("weekly_reward", 1000)
+        server_data["_settings"]["weekly_reward"] = amount
+        
+        save_server_data(data, guild_id, server_data)
+        await save_data(data, force=True)
+        
+        embed = discord.Embed(
+            title="✅ Weekly Reward Updated",
+            description=f"Weekly reward has been changed from **{old_amount:,}** to **{amount:,}** coins!",
+            color=0x00ff00
+        )
+        embed.add_field(name="Previous Amount", value=f"{old_amount:,} coins", inline=True)
+        embed.add_field(name="New Amount", value=f"{amount:,} coins", inline=True)
+        embed.set_footer(text="All users will now receive this amount when using /weekly")
+        
+        await interaction.response.send_message(embed=embed)
+
 async def setup(bot):
     await bot.add_cog(Admin(bot))

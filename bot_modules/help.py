@@ -144,10 +144,14 @@ class HelpCog(commands.Cog):
         
         embed.add_field(
             name="🛠️ Admin Tools", 
-            value="`/admin` - Admin command hub:\n"
-                  "• Give/take coins and items\n"
-                  "• Economy freeze/unfreeze\n"
-                  "• User data management\n"
+            value="`/givecoin` - Give coins to users\n"
+                  "`/takecoin` - Take coins from users\n"
+                  "`/giveitem` - Give items to users\n"
+                  "`/setdaily <amount>` - Set daily reward\n"
+                  "`/setweekly <amount>` - Set weekly reward\n"
+                  "`/economy_status` - View system stats\n"
+                  "`/set_loot_table` - Configure chest loot\n"
+                  "`/resetdata` - Reset economy (owner only)\n"
                   "*(Admin permissions required)*", 
             inline=True
         )

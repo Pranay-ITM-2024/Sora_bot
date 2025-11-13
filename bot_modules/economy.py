@@ -310,7 +310,7 @@ class Economy(commands.Cog):
         server_data = get_server_data(data, guild_id)
         
         last_daily = server_data.get("last_daily", {}).get(user_id)
-        daily_amount = data.get("config", {}).get("daily_amount", 150)
+        daily_amount = server_data.get("_settings", {}).get("daily_reward", 150)
         
         if last_daily:
             last_time = datetime.strptime(last_daily, "%Y-%m-%d")
@@ -401,7 +401,7 @@ class Economy(commands.Cog):
         server_data = get_server_data(data, guild_id)
         
         last_weekly = server_data.get("last_weekly", {}).get(user_id)
-        weekly_amount = data.get("config", {}).get("weekly_amount", 1000)
+        weekly_amount = server_data.get("_settings", {}).get("weekly_reward", 1000)
         
         if last_weekly:
             last_time = datetime.strptime(last_weekly, "%Y-%m-%dT%H:%M:%S.%f")
