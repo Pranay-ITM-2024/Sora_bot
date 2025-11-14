@@ -180,6 +180,12 @@ class Loan(commands.Cog):
             await interaction.response.send_message("❌ Payment amount must be positive!", ephemeral=True)
             return
         
+        # Check if user is trying to overpay
+        overpay_amount = 0
+        if amount > outstanding:
+            overpay_amount = amount - outstanding
+            amount = outstanding  # Only charge the outstanding amount
+        
         # Check if user has enough money
         wallet = server_data.get("coins", {}).get(user_id, 0)
         bank = server_data.get("bank", {}).get(user_id, 0)
@@ -218,6 +224,15 @@ class Loan(commands.Cog):
         embed = discord.Embed(title="✅ Payment Successful!", color=0x00ff00)
         embed.add_field(name="💵 Amount Paid", value=f"{amount:,} coins", inline=True)
         embed.add_field(name="💳 Outstanding", value=f"{loan['outstanding']:,} coins", inline=True)
+        
+        # Show overpayment refund if applicable
+        if overpay_amount > 0:
+            embed.add_field(
+                name="💸 Overpayment Refunded", 
+                value=f"{overpay_amount:,} coins (not charged)", 
+                inline=False
+            )
+            embed.set_footer(text="You can only pay up to the outstanding amount!")
         
         # Check if loan is fully paid
         if loan["outstanding"] <= 0:
