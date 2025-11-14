@@ -116,6 +116,94 @@ class InventoryView(discord.ui.View):
         }
         return emojis.get(category, "📦")
 
+class UseItemSelect(discord.ui.Select):
+    def __init__(self, consumables):
+        options = []
+        for item_key, item_name, quantity in consumables[:25]:  # Discord limit
+            options.append(
+                discord.SelectOption(
+                    label=f"{item_name} (x{quantity})",
+                    value=item_key,
+                    emoji="🧪"
+                )
+            )
+        super().__init__(placeholder="Select an item to use...", options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.view.use_selected_item(interaction, self.values[0])
+
+class UseItemView(discord.ui.View):
+    def __init__(self, user_id, consumables, server_data, bot):
+        super().__init__(timeout=180)
+        self.user_id = user_id
+        self.consumables = consumables
+        self.server_data = server_data
+        self.bot = bot
+        self.add_item(UseItemSelect(consumables))
+    
+    async def use_selected_item(self, interaction: discord.Interaction, item_key: str):
+        if str(interaction.user.id) != self.user_id:
+            await interaction.response.send_message("❌ This is not your inventory!", ephemeral=True)
+            return
+        
+        guild_id = str(interaction.guild.id)
+        data = await load_data()
+        server_data = self.bot.get_cog("Economy").get_server_data(guild_id)
+        user_inventory = server_data.get("inventories", {}).get(self.user_id, {})
+        
+        # Check if user still has the item
+        if item_key not in user_inventory or user_inventory[item_key] <= 0:
+            await interaction.response.edit_message(content="❌ You no longer have this item!", view=None)
+            return
+        
+        # Find item in shop
+        from .shop import SHOP_ITEMS
+        item_data = None
+        for category, items in SHOP_ITEMS.items():
+            if "Potions" in category:
+                for shop_item in items:
+                    if shop_item["key"] == item_key:
+                        item_data = shop_item
+                        break
+            if item_data:
+                break
+        
+        if not item_data:
+            await interaction.response.edit_message(content="❌ Item data not found!", view=None)
+            return
+        
+        # Use the item
+        user_inventory[item_key] -= 1
+        if user_inventory[item_key] <= 0:
+            del user_inventory[item_key]
+        
+        # Store consumable effect
+        if "consumable_effects" not in server_data:
+            server_data["consumable_effects"] = {}
+        if self.user_id not in server_data["consumable_effects"]:
+            server_data["consumable_effects"][self.user_id] = {}
+        
+        effect_type = item_data["effect_type"]
+        effect_value = item_data["effect_value"]
+        server_data["consumable_effects"][self.user_id][effect_type] = effect_value
+        
+        await save_data(data)
+        
+        # Send confirmation
+        embed = discord.Embed(
+            title=f"✨ Used {item_data['name']}!",
+            description=item_data["description"],
+            color=0x00ff00
+        )
+        embed.add_field(
+            name="Effect",
+            value=f"{effect_type.replace('_', ' ').title()}: +{effect_value*100:.0f}%",
+            inline=True
+        )
+        embed.description = "Effect will be applied to your next applicable action!"
+        
+        await interaction.response.edit_message(content=None, embed=embed, view=None)
+
 class Inventory(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -225,47 +313,44 @@ class Inventory(commands.Cog):
         await save_data(data)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="useitem", description="Use a consumable item.")
-    @app_commands.describe(item="Name of the consumable item to use")
-    async def useitem(self, interaction: discord.Interaction, item: str):
+    @app_commands.command(name="useitem", description="Use a consumable item from your inventory.")
+    async def useitem(self, interaction: discord.Interaction):
+        guild_id = str(interaction.guild.id)
         user_id = str(interaction.user.id)
-        item_key = item.lower().replace(' ', '_')
+        server_data = self.bot.get_cog("Economy").get_server_data(guild_id)
         
-        data = await load_data()
-        user_inventory = data.get("inventories", {}).get(user_id, {})
+        if "inventories" not in server_data:
+            server_data["inventories"] = {}
         
-        if item_key not in user_inventory or user_inventory[item_key] <= 0:
-            await interaction.response.send_message(f"❌ You don't have any {item}!", ephemeral=True)
+        if user_id not in server_data["inventories"]:
+            server_data["inventories"][user_id] = {}
+        
+        user_inventory = server_data["inventories"][user_id]
+        
+        # Filter consumable items from user's inventory
+        from .shop import SHOP_ITEMS
+        consumables = []
+        for item_key, quantity in user_inventory.items():
+            if quantity > 0:
+                # Check if it's a consumable (potion)
+                found = False
+                for category, items in SHOP_ITEMS.items():
+                    if "Potions" in category:
+                        for shop_item in items:
+                            if shop_item["key"] == item_key:
+                                consumables.append((item_key, shop_item["name"], quantity))
+                                found = True
+                                break
+                    if found:
+                        break
+        
+        if not consumables:
+            await interaction.response.send_message("❌ You don't have any consumable items!", ephemeral=True)
             return
         
-        # Check if item is consumable
-        shop_items = data.get("shop_items", {})
-        consumables = shop_items.get("consumables", {})
-        
-        if item_key not in consumables:
-            await interaction.response.send_message("❌ This item is not consumable!", ephemeral=True)
-            return
-        
-        item_data = consumables[item_key]
-        effect_type = item_data.get("effect")
-        effect_value = item_data.get("value")
-        
-        # Remove item from inventory
-        data.setdefault("inventories", {}).setdefault(user_id, {})[item_key] -= 1
-        if data["inventories"][user_id][item_key] <= 0:
-            del data["inventories"][user_id][item_key]
-        
-        # Apply effect
-        data.setdefault("consumable_effects", {}).setdefault(user_id, {})[effect_type] = effect_value
-        
-        await save_data(data)
-        
-        embed = discord.Embed(title="� Item Used", color=get_rarity_color(item_data.get("rarity", "Common")))
-        embed.add_field(name="Item", value=item_data["name"], inline=True)
-        embed.add_field(name="Effect", value=f"{effect_type.replace('_', ' ').title()}: +{effect_value*100:.0f}%", inline=True)
-        embed.description = "Effect will be applied to your next applicable action!"
-        
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        # Create the dropdown view
+        view = UseItemView(user_id, consumables, server_data, self.bot)
+        await interaction.response.send_message("Select an item to use:", view=view, ephemeral=True)
 
     @app_commands.command(name="equip", description="Equip an item for passive effects.")
     @app_commands.describe(item="Name of the item to equip")
