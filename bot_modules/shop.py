@@ -8,112 +8,289 @@ import random
 from .database import load_data, save_data
 from .economy import deduct_combined_balance
 
-# 🛒 SHOP CATALOG - Pre-defined items with clear descriptions!
+# 🛒 SHOP CATALOG - Balanced progression system with variety!
 SHOP_ITEMS = {
-    "🧪 Potions": {
-        "luck_potion": {
+    "🧪 Potions": [
+        {
+            "key": "luck_potion",
             "name": "🍀 Luck Potion",
-            "price": 500,
-            "desc": "Increases your casino winnings by 20% for 1 hour",
-            "type": "boost"
-        },
-        "wealth_potion": {
-            "name": "💰 Wealth Potion",
-            "price": 1000,
-            "desc": "Get 2x coins from daily/weekly rewards for 24 hours",
-            "type": "boost"
-        },
-        "xp_boost": {
-            "name": "⭐ XP Boost",
-            "price": 750,
-            "desc": "Earn 50% more coins from all activities for 2 hours",
-            "type": "boost"
-        }
-    },
-    "🎁 Chests": {
-        "small_chest": {
-            "name": "📦 Small Chest",
-            "price": 250,
-            "desc": "Contains 100-500 random coins when opened",
-            "type": "chest"
-        },
-        "medium_chest": {
-            "name": "🎁 Medium Chest",
-            "price": 750,
-            "desc": "Contains 500-2,000 coins or a random item",
-            "type": "chest"
-        },
-        "large_chest": {
-            "name": "🏆 Large Chest",
-            "price": 2000,
-            "desc": "Contains 2,000-10,000 coins or a rare item",
-            "type": "chest"
-        }
-    },
-    "⚔️ Equipment": {
-        "lucky_charm": {
-            "name": "🔮 Lucky Charm",
-            "price": 3000,
-            "desc": "Permanent +10% casino winnings (equip to activate)",
-            "type": "equipment"
-        },
-        "piggy_bank": {
-            "name": "🐷 Piggy Bank",
-            "price": 2500,
-            "desc": "Permanent +15% daily/weekly rewards (equip to activate)",
-            "type": "equipment"
-        },
-        "golden_horseshoe": {
-            "name": "🌟 Golden Horseshoe",
             "price": 5000,
-            "desc": "Permanent +25% rob success rate (equip to activate)",
-            "type": "equipment"
-        }
-    },
-    "🔧 Heist Gear": {
-        "lockpick_pro": {
-            "name": "🔓 Pro Lockpick",
-            "price": 3500,
-            "desc": "+15% stealth, +10% speed for heists (equip to activate)",
-            "type": "equipment"
+            "desc": "+20% success chance on next action (heists, casino)",
+            "rarity": "Rare",
+            "effect_type": "luck_boost",
+            "effect_value": 0.20
         },
-        "night_vision_goggles": {
-            "name": "👓 Night Vision Goggles",
+        {
+            "key": "speed_potion",
+            "name": "⚡ Speed Potion",
             "price": 4000,
-            "desc": "+20% stealth, -15% detection for heists (equip to activate)",
-            "type": "equipment"
+            "desc": "+15% heist progress per phase",
+            "rarity": "Rare",
+            "effect_type": "speed_boost",
+            "effect_value": 0.15
         },
-        "smoke_bomb": {
-            "name": "💣 Smoke Bomb",
-            "price": 1500,
-            "desc": "+25% escape, +10% stealth (consumable, 1 use)",
-            "type": "consumable"
-        },
-        "master_disguise": {
-            "name": "🎭 Master Disguise",
-            "price": 5000,
-            "desc": "+30% stealth, -20% detection for heists (equip to activate)",
-            "type": "equipment"
-        },
-        "getaway_car": {
-            "name": "🚗 Getaway Car",
-            "price": 7500,
-            "desc": "+30% escape, +15% speed for heists (equip to activate)",
-            "type": "equipment"
-        },
-        "hacking_device": {
-            "name": "💻 Hacking Device",
+        {
+            "key": "stealth_elixir",
+            "name": "🥷 Stealth Elixir",
             "price": 6000,
-            "desc": "+25% security bypass, +10% speed for heists (equip to activate)",
-            "type": "equipment"
+            "desc": "+25% stealth bonus for next heist",
+            "rarity": "Epic",
+            "effect_type": "stealth_boost",
+            "effect_value": 0.25
         },
-        "thermal_drill": {
-            "name": "🔥 Thermal Drill",
-            "price": 4500,
-            "desc": "+20% speed, +10% noise for heists (equip to activate)",
-            "type": "equipment"
+        {
+            "key": "fortune_tonic",
+            "name": "💰 Fortune Tonic",
+            "price": 10000,
+            "desc": "+30% reward multiplier on next earnings",
+            "rarity": "Epic",
+            "effect_type": "reward_boost",
+            "effect_value": 0.30
+        },
+        {
+            "key": "focus_serum",
+            "name": "🎯 Focus Serum",
+            "price": 3500,
+            "desc": "+10% accuracy on minigames",
+            "rarity": "Common",
+            "effect_type": "accuracy_boost",
+            "effect_value": 0.10
+        },
+        {
+            "key": "energy_drink",
+            "name": "⚡ Energy Drink",
+            "price": 2000,
+            "desc": "+5% to all activities for 1 hour",
+            "rarity": "Common",
+            "effect_type": "general_boost",
+            "effect_value": 0.05
         }
-    }
+    ],
+    "🎁 Chests": [
+        {
+            "key": "common_chest",
+            "name": "📦 Common Chest",
+            "price": 1000,
+            "desc": "500-2,000 coins or common item | 5% mimic chance",
+            "rarity": "Common",
+            "min_coins": 500,
+            "max_coins": 2000,
+            "mimic_chance": 0.05
+        },
+        {
+            "key": "rare_chest",
+            "name": "🎁 Rare Chest",
+            "price": 5000,
+            "desc": "2,000-10,000 coins or rare item | 10% mimic chance",
+            "rarity": "Rare",
+            "min_coins": 2000,
+            "max_coins": 10000,
+            "mimic_chance": 0.10
+        },
+        {
+            "key": "epic_chest",
+            "name": "💎 Epic Chest",
+            "price": 15000,
+            "desc": "10,000-50,000 coins or epic item | 15% mimic chance",
+            "rarity": "Epic",
+            "min_coins": 10000,
+            "max_coins": 50000,
+            "mimic_chance": 0.15
+        },
+        {
+            "key": "legendary_chest",
+            "name": "🏆 Legendary Chest",
+            "price": 50000,
+            "desc": "50,000-200,000 coins or legendary item | 20% mimic chance",
+            "rarity": "Legendary",
+            "min_coins": 50000,
+            "max_coins": 200000,
+            "mimic_chance": 0.20
+        },
+        {
+            "key": "mimic_protection",
+            "name": "🛡️ Mimic Protection",
+            "price": 2500,
+            "desc": "Prevents next chest from being a mimic (1 use)",
+            "rarity": "Rare",
+            "effect_type": "mimic_shield",
+            "effect_value": 1
+        }
+    ],
+    "🎰 Casino Gear": [
+        {
+            "key": "lucky_charm",
+            "name": "🔮 Lucky Charm",
+            "price": 25000,
+            "desc": "+5% win rate on all casino games (permanent)",
+            "rarity": "Epic",
+            "slot": "accessory",
+            "bonus_type": "casino_luck",
+            "bonus_value": 0.05
+        },
+        {
+            "key": "weighted_dice",
+            "name": "🎲 Weighted Dice",
+            "price": 40000,
+            "desc": "+10% better odds in blackjack (permanent)",
+            "rarity": "Epic",
+            "slot": "tool",
+            "bonus_type": "blackjack_boost",
+            "bonus_value": 0.10
+        },
+        {
+            "key": "slot_magnet",
+            "name": "🧲 Slot Magnet",
+            "price": 35000,
+            "desc": "+8% slot machine payouts (permanent)",
+            "rarity": "Epic",
+            "slot": "tool",
+            "bonus_type": "slots_boost",
+            "bonus_value": 0.08
+        },
+        {
+            "key": "coin_doubler",
+            "name": "💰 Coin Doubler",
+            "price": 100000,
+            "desc": "2x winnings on coinflip (4x total!) (permanent)",
+            "rarity": "Legendary",
+            "slot": "accessory",
+            "bonus_type": "coinflip_double",
+            "bonus_value": 2.0
+        },
+        {
+            "key": "card_counter",
+            "name": "🃏 Card Counter",
+            "price": 50000,
+            "desc": "See hints about dealer's cards in blackjack (permanent)",
+            "rarity": "Legendary",
+            "slot": "accessory",
+            "bonus_type": "card_hints",
+            "bonus_value": 1
+        }
+    ],
+    "🔧 Heist Gear": [
+        {
+            "key": "night_vision_goggles",
+            "name": "👓 Night Vision Goggles",
+            "price": 20000,
+            "desc": "-15% detection chance (permanent)",
+            "rarity": "Rare",
+            "slot": "head",
+            "bonus_type": "stealth",
+            "bonus_value": 0.15
+        },
+        {
+            "key": "silent_shoes",
+            "name": "� Silent Shoes",
+            "price": 15000,
+            "desc": "-20% noise generation (permanent)",
+            "rarity": "Rare",
+            "slot": "feet",
+            "bonus_type": "stealth",
+            "bonus_value": 0.20
+        },
+        {
+            "key": "cloaking_device",
+            "name": "�️ Cloaking Device",
+            "price": 50000,
+            "desc": "-30% visibility (permanent)",
+            "rarity": "Legendary",
+            "slot": "accessory",
+            "bonus_type": "stealth",
+            "bonus_value": 0.30
+        },
+        {
+            "key": "adrenaline_injector",
+            "name": "💉 Adrenaline Injector",
+            "price": 18000,
+            "desc": "+15% heist progress (permanent)",
+            "rarity": "Rare",
+            "slot": "accessory",
+            "bonus_type": "speed",
+            "bonus_value": 0.15
+        },
+        {
+            "key": "jetpack",
+            "name": "🚀 Jetpack",
+            "price": 60000,
+            "desc": "+25% escape speed (permanent)",
+            "rarity": "Epic",
+            "slot": "back",
+            "bonus_type": "escape",
+            "bonus_value": 0.25
+        },
+        {
+            "key": "turbo_boots",
+            "name": "� Turbo Boots",
+            "price": 25000,
+            "desc": "+20% movement speed (permanent)",
+            "rarity": "Epic",
+            "slot": "feet",
+            "bonus_type": "speed",
+            "bonus_value": 0.20
+        },
+        {
+            "key": "master_keycard",
+            "name": "🔑 Master Keycard",
+            "price": 30000,
+            "desc": "+20% vault access (permanent)",
+            "rarity": "Epic",
+            "slot": "tool",
+            "bonus_type": "security",
+            "bonus_value": 0.20
+        },
+        {
+            "key": "emp_device",
+            "name": "📡 EMP Device",
+            "price": 45000,
+            "desc": "Disables 50% of alarms (permanent)",
+            "rarity": "Legendary",
+            "slot": "tool",
+            "bonus_type": "security",
+            "bonus_value": 0.50
+        },
+        {
+            "key": "hacking_kit",
+            "name": "💻 Hacking Kit",
+            "price": 35000,
+            "desc": "+25% tech approach success (permanent)",
+            "rarity": "Epic",
+            "slot": "tool",
+            "bonus_type": "tech",
+            "bonus_value": 0.25
+        },
+        {
+            "key": "lockpick_set",
+            "name": "🔓 Professional Lockpick Set",
+            "price": 12000,
+            "desc": "+10% lockpicking success (permanent)",
+            "rarity": "Rare",
+            "slot": "tool",
+            "bonus_type": "lockpick",
+            "bonus_value": 0.10
+        },
+        {
+            "key": "thermal_vision",
+            "name": "🔥 Thermal Vision",
+            "price": 28000,
+            "desc": "+15% detection avoidance (permanent)",
+            "rarity": "Epic",
+            "slot": "head",
+            "bonus_type": "detection",
+            "bonus_value": 0.15
+        },
+        {
+            "key": "grappling_hook",
+            "name": "🪝 Grappling Hook",
+            "price": 22000,
+            "desc": "+18% escape success (permanent)",
+            "rarity": "Rare",
+            "slot": "tool",
+            "bonus_type": "escape",
+            "bonus_value": 0.18
+        }
+    ]
 }
 
 
@@ -246,9 +423,9 @@ class CategoryView(discord.ui.View):
         self.category_name = category_name
         
         # Add dropdown with items from this category
-        items = SHOP_ITEMS[category_name]
+        items = SHOP_ITEMS[self.category_name]
         options = []
-        for item_key, item_data in items.items():
+        for item_data in items:
             # Truncate description if too long
             desc = item_data['desc']
             if len(desc) > 100:
@@ -257,11 +434,14 @@ class CategoryView(discord.ui.View):
             # Extract emoji from item name
             emoji_part = item_data['name'].split()[0] if item_data['name'] else "🛒"
             
+            # Add rarity indicator
+            rarity_emoji = {"Common": "⚪", "Rare": "🔵", "Epic": "🟣", "Legendary": "🟡"}.get(item_data.get('rarity', 'Common'), "⚪")
+            
             options.append(
                 discord.SelectOption(
                     label=f"{item_data['name']} - {item_data['price']:,} coins",
-                    value=item_key,
-                    description=desc,
+                    value=item_data['key'],
+                    description=f"{rarity_emoji} {desc}",
                     emoji=emoji_part
                 )
             )
@@ -282,7 +462,11 @@ class CategoryView(discord.ui.View):
         
         item_key = interaction.data['values'][0]
         items = SHOP_ITEMS[self.category_name]
-        item_data = items[item_key]
+        item_data = next((item for item in items if item['key'] == item_key), None)
+        
+        if not item_data:
+            await interaction.response.send_message("❌ Item not found!", ephemeral=True)
+            return
         
         # Show purchase confirmation
         view = PurchaseView(self.user_id, self.guild_id, item_key, item_data, self.category_name)
@@ -339,25 +523,31 @@ class CategoryView(discord.ui.View):
         
         embed.add_field(
             name="🧪 Potions",
-            value="Temporary boosts for casino, earnings, and rewards",
+            value="Consumable boosts: luck, speed, stealth, fortune (6 types)",
             inline=True
         )
         
         embed.add_field(
             name="🎁 Chests",
-            value="Open for random coins and items",
+            value="Random rewards: Common to Legendary (+ Mimic Protection)",
             inline=True
         )
         
         embed.add_field(
-            name="⚔️ Equipment",
-            value="Permanent passive bonuses when equipped",
+            name="🎰 Casino Gear",
+            value="Permanent casino bonuses: slots, blackjack, coinflip (5 items)",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="🔧 Heist Gear",
+            value="Heist equipment: stealth, speed, security bypass (12 items)",
             inline=True
         )
         
         embed.set_footer(text="💡 Select items from dropdown menus - no typing needed!")
         
-        view = ShopView(self.user_id)
+        view = ShopView(self.user_id, self.guild_id)
         await interaction.response.edit_message(embed=embed, view=view)
 
 
@@ -382,12 +572,19 @@ class ShopView(discord.ui.View):
             return
         await self.show_category(interaction, "🎁 Chests")
     
-    @discord.ui.button(label="⚔️ Equipment", style=discord.ButtonStyle.primary, row=0)
-    async def equipment_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label="🎰 Casino Gear", style=discord.ButtonStyle.primary, row=0)
+    async def casino_gear_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if str(interaction.user.id) != self.user_id:
             await interaction.response.send_message("❌ Not your shop!", ephemeral=True)
             return
-        await self.show_category(interaction, "⚔️ Equipment")
+        await self.show_category(interaction, "🎰 Casino Gear")
+    
+    @discord.ui.button(label="🔧 Heist Gear", style=discord.ButtonStyle.primary, row=1)
+    async def heist_gear_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if str(interaction.user.id) != self.user_id:
+            await interaction.response.send_message("❌ Not your shop!", ephemeral=True)
+            return
+        await self.show_category(interaction, "🔧 Heist Gear")
     
     async def show_category(self, interaction, category_name):
         """Show items in category with dropdown"""
@@ -404,11 +601,12 @@ class ShopView(discord.ui.View):
         )
         
         items = SHOP_ITEMS[category_name]
-        for item_key, item in items.items():
+        for item in items:
             can_afford = "✅" if user_coins >= item['price'] else "❌"
+            rarity_emoji = {"Common": "⚪", "Rare": "🔵", "Epic": "🟣", "Legendary": "🟡"}.get(item.get('rarity', 'Common'), "⚪")
             embed.add_field(
                 name=f"{can_afford} {item['name']} - {item['price']:,} coins",
-                value=f"📝 {item['desc']}",
+                value=f"{rarity_emoji} {item['rarity']} | {item['desc']}",
                 inline=False
             )
         
@@ -435,8 +633,8 @@ class Shop(commands.Cog):
         user_coins = server_data.get("coins", {}).get(user_id, 0)
         
         embed = discord.Embed(
-            title="🛒 SORABOT SHOP",
-            description="**Welcome!** Click a category button, then select items from the dropdown.\n\n💡 **No typing needed - just click and select!**",
+            title="🛒 SORABOT SHOP - UPGRADED!",
+            description="**Welcome to the NEW shop!** 29 unique items across 4 categories.\n\n💡 **Easy shopping:** Click category → Select from dropdown → Buy!\n⚪ Common | 🔵 Rare | 🟣 Epic | 🟡 Legendary",
             color=0x00ff00
         )
         
@@ -447,24 +645,30 @@ class Shop(commands.Cog):
         )
         
         embed.add_field(
-            name="🧪 Potions",
-            value="Temporary boosts for casino, earnings, and rewards",
+            name="🧪 Potions (6 items)",
+            value="Luck, Speed, Stealth, Fortune, Focus, Energy\n💰 2k-10k coins",
             inline=True
         )
         
         embed.add_field(
-            name="🎁 Chests",
-            value="Open for random coins and items",
+            name="🎁 Chests (5 items)",
+            value="Common, Rare, Epic, Legendary + Protection\n💰 1k-50k coins",
             inline=True
         )
         
         embed.add_field(
-            name="⚔️ Equipment",
-            value="Permanent passive bonuses when equipped",
+            name="🎰 Casino Gear (5 items)",
+            value="Lucky Charm, Dice, Magnet, Doubler, Counter\n💰 25k-100k coins",
             inline=True
         )
         
-        embed.set_footer(text="💡 Click a button above to get started!")
+        embed.add_field(
+            name="🔧 Heist Gear (12 items)",
+            value="Night Vision, Silent Shoes, EMP, Jetpack +more\n💰 12k-60k coins",
+            inline=True
+        )
+        
+        embed.set_footer(text="💡 All equipment is PERMANENT and REUSABLE! Start with potions for quick boosts.")
         
         view = ShopView(user_id, guild_id)
         await interaction.response.send_message(embed=embed, view=view)
