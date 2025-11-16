@@ -1,0 +1,563 @@
+===========================================
+🛒 SHOP & INVENTORY SYSTEM - COMPLETE GUIDE
+===========================================
+
+Everything about buying, using, and managing
+items in Sora Bot.
+
+===========================================
+🏪 SHOP SYSTEM
+===========================================
+
+COMMAND: /shop
+
+HOW IT WORKS:
+1. Click /shop command
+2. Dropdown appears with categories
+3. Select category to browse
+4. Items show with prices and descriptions
+5. Click "Purchase" button
+6. Confirm purchase
+7. Item added to inventory!
+
+CATEGORIES:
+🧪 Potions - Consumable effect boosters
+🎁 Chests - Random loot boxes
+🎯 Heist Gear - Equipment for heists
+🎰 Casino Boosters - Gambling enhancers
+
+PAYMENT:
+- Deducts from wallet first
+- If not enough, takes from bank
+- Must have total funds available
+
+EXAMPLES:
+
+Example 1: Buying a Potion
+Step 1: /shop
+Step 2: Select "🧪 Potions"
+Step 3: See list:
+  - Luck Potion (5,000 coins)
+  - Speed Potion (4,000 coins)
+  - Stealth Elixir (6,000 coins)
+Step 4: Click "Purchase" on Luck Potion
+Step 5: Confirm
+Result: -5,000 coins, +1 Luck Potion in inventory
+
+Example 2: Buying Gear
+Your balance: 25,000 coins (10k wallet, 15k bank)
+Item: Night Vision Goggles (20,000 coins)
+Click purchase:
+- Takes 10,000 from wallet
+- Takes 10,000 from bank
+- Total: 20,000 deducted
+- Item added to inventory
+
+Example 3: Insufficient Funds
+Your balance: 3,000 coins
+Item: Master Keycard (30,000 coins)
+Click purchase:
+Error: "❌ Insufficient funds!"
+You need: 27,000 more coins
+
+===========================================
+🎒 INVENTORY SYSTEM
+===========================================
+
+COMMAND: /inventory or /inv
+
+WHAT IT SHOWS:
+- All items you own
+- Quantity of each item
+- Currently equipped gear
+- Filterable by category
+
+FEATURES:
+- Filter by: All Items, Consumables, Equipables, Chests
+- Shows item rarity colors
+- Displays equipped items at top
+- Up to 15 items per view
+
+EXAMPLE INVENTORY:
+
+⚔️ EQUIPPED:
+Head: Night Vision Goggles
+Feet: Silent Shoes
+Tool: Hacking Kit
+
+📦 ALL ITEMS:
+🧪 Luck Potion x3 (Rare)
+🧪 Stealth Elixir x1 (Epic)
+🎁 Rare Chest x2 (Rare)
+🎁 Epic Chest x1 (Epic)
+⚔️ Adrenaline Injector x1 (Epic)
+🎰 Lucky Charm x1 (Legendary)
+... and 5 more items
+
+===========================================
+🧪 CONSUMABLE ITEMS (POTIONS)
+===========================================
+
+HOW TO USE: /useitem (dropdown selection)
+
+Consumables are ONE-TIME USE items that give
+temporary bonuses to your next action.
+
+AVAILABLE POTIONS:
+
+1. LUCK POTION
+Price: 5,000 coins
+Effect: +20% success chance
+Duration: Next applicable action
+Best for: Risky heists, casino games
+Rarity: Rare
+
+Example:
+Use Luck Potion
+Do /soloheist 50,000
+Normal success: 70%
+With potion: 90%
+Higher chance to succeed!
+
+2. SPEED POTION
+Price: 4,000 coins
+Effect: +15% progress boost
+Duration: Next heist phase
+Best for: Fast approach heists
+Rarity: Rare
+
+Example:
+Use Speed Potion
+Do /soloheist Fast approach
+Normal progress: 45% per phase
+With potion: 52% per phase
+Finish heist faster!
+
+3. STEALTH ELIXIR
+Price: 6,000 coins
+Effect: +25% stealth bonus
+Duration: Next heist
+Best for: Stealth approach
+Rarity: Epic
+
+Example:
+Use Stealth Elixir
+Do /soloheist Stealth approach
+Normal noise: 20%
+With elixir: 15%
+Lower detection chance!
+
+4. FORTUNE TONIC
+Price: 10,000 coins
+Effect: +30% reward multiplier
+Duration: Next reward earned
+Best for: Big heists, jackpot attempts
+Rarity: Epic
+
+Example:
+Use Fortune Tonic
+Complete heist for 100,000
+Normal payout: 100,000
+With tonic: 130,000 coins!
+Extra 30,000 profit!
+
+5. FOCUS SERUM
+Price: 3,500 coins
+Effect: +10% accuracy
+Duration: Next minigame
+Best for: Difficult minigames
+Rarity: Common
+
+Example:
+Use Focus Serum
+Play blackjack
+Slightly better card decisions
+More wins over time
+
+USING CONSUMABLES:
+
+Old way (typing): /useitem luck_potion
+New way (dropdown): /useitem → Select from list
+
+Step-by-step:
+1. Type /useitem
+2. Dropdown appears with YOUR items
+3. Select item (e.g., "Luck Potion x3")
+4. Item consumed (quantity: 3 → 2)
+5. Effect activated!
+6. Do action (heist, casino, etc.)
+7. Effect applies automatically
+8. Effect removed after use
+
+===========================================
+🎁 LOOT CHESTS
+===========================================
+
+HOW TO OPEN: /openchest <rarity>
+
+Examples:
+/openchest common
+/openchest rare
+/openchest epic
+/openchest legendary
+
+CHEST TYPES:
+
+1. COMMON CHEST
+Price: 1,000 coins
+Contains: 500-2,000 coins OR common item
+Mimic chance: 5%
+Value: Low risk, low reward
+
+Example Opening:
+/openchest common
+Result: 🎉 You got 1,450 coins!
+OR
+Result: 🎉 You got Focus Serum!
+
+2. RARE CHEST
+Price: 5,000 coins
+Contains: 2,000-10,000 coins OR rare item
+Mimic chance: 10%
+Value: Medium risk, medium reward
+
+Example Opening:
+/openchest rare
+Result: 🎉 You got 7,200 coins!
+OR
+Result: 🎉 You got Luck Potion!
+
+3. EPIC CHEST
+Price: 15,000 coins
+Contains: 10,000-50,000 coins OR epic item
+Mimic chance: 15%
+Value: High risk, high reward
+
+Example Opening:
+/openchest epic
+Result: 🎉 You got 32,000 coins!
+OR
+Result: 🎉 You got Stealth Elixir!
+
+4. LEGENDARY CHEST
+Price: 50,000 coins
+Contains: 50,000-200,000 coins OR legendary item
+Mimic chance: 20%
+Value: Highest risk, highest reward
+
+Example Opening:
+/openchest legendary
+Result: 🎉 You got 156,000 coins!
+OR
+Result: 🎉 You got Cloaking Device!
+
+MIMIC ATTACKS:
+If you hit a mimic (random chance):
+- Chest was a trap!
+- Lose coins from wallet
+- Amount = 30% of chest price
+
+Example:
+Open Epic Chest (15,000)
+Result: 😈 IT'S A MIMIC!
+Loss: 4,500 coins (30% of 15,000)
+
+MIMIC PROTECTION:
+Buy "Mimic Shield" from shop
+One-time use per chest
+Prevents mimic attacks
+Worth it for expensive chests!
+
+===========================================
+⚔️ EQUIPMENT SYSTEM
+===========================================
+
+EQUIPPING: /equip <item_name>
+UNEQUIPPING: /unequip <item_name>
+
+Equipment provides PERMANENT bonuses
+while equipped. Only unequip to switch items.
+
+EQUIPMENT SLOTS:
+Head - Goggles, helmets, etc.
+Feet - Shoes, boots
+Back - Jetpacks, cloaks
+Accessory - Charms, injectors
+Tool - Devices, kits, cards
+
+You can equip ONE item per slot (5 total).
+
+EXAMPLES:
+
+Example 1: Equipping Gear
+Inventory: Night Vision Goggles (unequipped)
+Command: /equip Night Vision Goggles
+Result: Goggles equipped to Head slot
+Bonus: -15% detection (active!)
+
+Example 2: Switching Items
+Currently equipped: Silent Shoes
+Want to equip: Turbo Boots
+Command: /equip Turbo Boots
+Result: Silent Shoes → inventory, Turbo Boots → Feet slot
+
+Example 3: Full Loadout
+/equip Night Vision Goggles (Head)
+/equip Silent Shoes (Feet)
+/equip Jetpack (Back)
+/equip Adrenaline Injector (Accessory)
+/equip Hacking Kit (Tool)
+
+Total bonuses:
+- 15% detection reduction
+- 20% noise reduction
+- 25% escape speed
+- 15% progress boost
+- 25% tech success
+
+Example 4: Unequipping
+Command: /unequip Hacking Kit
+Result: Hacking Kit → inventory
+Tool slot: Empty
+Bonus: -25% tech success (removed)
+
+===========================================
+🎯 HEIST GEAR DETAILED
+===========================================
+
+STEALTH CATEGORY:
+
+Night Vision Goggles
+Price: 20,000 coins
+Slot: Head
+Effect: -15% detection chance
+Best for: All heists, Scout role
+Worth: ⭐⭐⭐⭐⭐
+
+Silent Shoes
+Price: 15,000 coins
+Slot: Feet
+Effect: -20% noise generation
+Best for: Stealth approach
+Worth: ⭐⭐⭐⭐⭐
+
+Cloaking Device
+Price: 50,000 coins
+Slot: Accessory
+Effect: -30% visibility
+Best for: High-risk heists
+Worth: ⭐⭐⭐⭐
+
+SPEED CATEGORY:
+
+Adrenaline Injector
+Price: 18,000 coins
+Slot: Accessory
+Effect: +15% heist progress
+Best for: Fast approach
+Worth: ⭐⭐⭐⭐
+
+Jetpack
+Price: 60,000 coins
+Slot: Back
+Effect: +25% escape speed
+Best for: Phase 3 escapes
+Worth: ⭐⭐⭐⭐
+
+Turbo Boots
+Price: 25,000 coins
+Slot: Feet
+Effect: +20% movement speed
+Best for: Driver role
+Worth: ⭐⭐⭐⭐
+
+SECURITY CATEGORY:
+
+Master Keycard
+Price: 30,000 coins
+Slot: Tool
+Effect: +20% vault access
+Best for: Phase 2, Muscle role
+Worth: ⭐⭐⭐⭐⭐
+
+EMP Device
+Price: 45,000 coins
+Slot: Tool
+Effect: Disables 50% of alarms
+Best for: Tech approach
+Worth: ⭐⭐⭐⭐
+
+Hacking Kit
+Price: 35,000 coins
+Slot: Tool
+Effect: +25% tech approach success
+Best for: Hacker role
+Worth: ⭐⭐⭐⭐⭐
+
+===========================================
+🎰 CASINO BOOSTERS DETAILED
+===========================================
+
+Lucky Charm
+Price: 25,000 coins
+Slot: Accessory
+Effect: +5% casino wins
+Games: All casino games
+Worth: ⭐⭐⭐⭐⭐
+
+Weighted Dice
+Price: 40,000 coins
+Slot: Tool
+Effect: +10% blackjack odds
+Games: Blackjack only
+Worth: ⭐⭐⭐⭐
+
+Slot Magnet
+Price: 35,000 coins
+Slot: Tool
+Effect: +8% slot payouts
+Games: Slots only
+Worth: ⭐⭐⭐⭐
+
+Coin Doubler
+Price: 100,000 coins
+Slot: Accessory
+Effect: 2x coinflip winnings (4x total!)
+Games: Coinflip only
+Worth: ⭐⭐⭐⭐⭐
+
+Card Counter
+Price: 50,000 coins
+Slot: Tool
+Effect: Hints about dealer's cards
+Games: Blackjack only
+Worth: ⭐⭐⭐⭐
+
+===========================================
+💰 SHOPPING STRATEGY
+===========================================
+
+PRIORITY 1 (0-50k balance):
+1. Silent Shoes (15k) - Best value heist gear
+2. Lucky Charm (25k) - Universal bonus
+3. Save remaining for heists
+
+PRIORITY 2 (50k-150k balance):
+1. Night Vision Goggles (20k)
+2. Master Keycard (30k)
+3. Hacking Kit (35k)
+4. Stock up on potions
+
+PRIORITY 3 (150k-500k balance):
+1. Slot Magnet (35k)
+2. Cloaking Device (50k)
+3. Card Counter (50k)
+4. Open Rare/Epic chests
+
+PRIORITY 4 (500k+ balance):
+1. Coin Doubler (100k)
+2. Jetpack (60k)
+3. Legendary chests
+4. Full gear collection
+
+SMART BUYING:
+✅ Buy gear for your playstyle
+✅ Wait for sales (if added)
+✅ Prioritize permanent items
+✅ Consumables for big moments only
+❌ Don't buy everything at once
+❌ Don't buy chests when low on funds
+❌ Don't buy gear you won't use
+
+===========================================
+📊 ITEM VALUE ANALYSIS
+===========================================
+
+BEST OVERALL VALUE:
+1. Silent Shoes - 15k for universal -20% noise
+2. Lucky Charm - 25k for +5% all casino
+3. Master Keycard - 30k for +20% vault
+
+BEST FOR HEISTS:
+1. Hacking Kit - 35k for +25% tech
+2. Night Vision Goggles - 20k for -15% detection
+3. Adrenaline Injector - 18k for +15% progress
+
+BEST FOR CASINO:
+1. Coin Doubler - 100k but 4x coinflip wins
+2. Card Counter - 50k blackjack edge
+3. Slot Magnet - 35k for +8% slots
+
+BEST CONSUMABLES:
+1. Fortune Tonic - 10k for +30% rewards
+2. Stealth Elixir - 6k for +25% stealth
+3. Luck Potion - 5k for +20% success
+
+===========================================
+💡 INVENTORY PRO TIPS
+===========================================
+
+1. KEEP IT ORGANIZED
+   - Equip gear you use regularly
+   - Stock 2-3 of each potion
+   - Open chests regularly (don't hoard)
+
+2. POTIONS FOR BIG MOMENTS
+   - Fortune Tonic + 500k heist = huge profit
+   - Luck Potion + legendary chest = better odds
+   - Don't waste on small actions
+
+3. GEAR COMBINATIONS
+   - Stealth set: Goggles + Shoes + Cloak
+   - Speed set: Injector + Boots + Jetpack
+   - Mix and match for balance
+
+4. CHEST STRATEGY
+   - Buy common for consistent small gains
+   - Epic for excitement
+   - Legendary only with 200k+ balance
+
+5. EQUIPMENT CHANGES
+   - Swap gear based on activity
+   - Heist gear for heists
+   - Casino gear for gambling
+   - Takes 2 seconds, worth it!
+
+===========================================
+❓ SHOP & INVENTORY FAQ
+===========================================
+
+Q: Can I sell items back?
+A: Not currently, choose wisely!
+
+Q: Do consumables expire?
+A: No, keep forever until used
+
+Q: Can equipment break?
+A: No, permanent once bought
+
+Q: How many items can I own?
+A: Unlimited inventory space
+
+Q: Can I trade with friends?
+A: Not currently implemented
+
+Q: Do potions stack?
+A: No, only one active effect at a time
+
+Q: What happens if I use /useitem with no items?
+A: Error: "You don't have any consumable items!"
+
+Q: Can I equip 2 items in same slot?
+A: No, one per slot (5 slots total)
+
+Q: Is gear account-wide or server-specific?
+A: Server-specific (separate per Discord server)
+
+Q: Best first purchase?
+A: Silent Shoes (15k) for heists
+
+===========================================
+
+Build your perfect loadout! 🛒⚔️
+Start shopping with /shop today!

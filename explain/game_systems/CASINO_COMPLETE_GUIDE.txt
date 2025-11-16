@@ -1,0 +1,436 @@
+===========================================
+🎰 CASINO SYSTEM - COMPLETE GUIDE
+===========================================
+
+This guide explains all casino games in Sora Bot
+with detailed mechanics, strategies, and examples.
+
+===========================================
+🎮 AVAILABLE GAMES
+===========================================
+
+1. SLOTS - 5-reel slot machine with progressive jackpot
+2. BLACKJACK - Classic card game against dealer
+3. COINFLIP - Simple heads/tails betting
+
+===========================================
+🎰 SLOTS GAME EXPLAINED
+===========================================
+
+COMMAND: /slots <bet_amount>
+
+HOW IT WORKS:
+1. You place a bet (minimum 10 coins)
+2. 5 reels spin independently
+3. Each reel lands on a random symbol
+4. If 3+ matching symbols = WIN!
+5. Winnings based on symbol rarity
+
+SYMBOLS & MULTIPLIERS:
+🍒 Cherry  → 2x your bet  (Most Common)
+🍋 Lemon   → 5x your bet  (Common)
+🍊 Orange  → 10x your bet (Uncommon)
+💎 Diamond → 20x your bet (Rare)
+🎰 777     → JACKPOT!     (Very Rare - 0.1% chance)
+
+EXAMPLES:
+
+Example 1: Small Win
+You bet: 100 coins
+Result: 🍒 🍒 🍒 🍋 🍊
+Match: 3 Cherries
+Payout: 100 × 2 = 200 coins
+Profit: +100 coins
+
+Example 2: Big Win
+You bet: 500 coins
+Result: 💎 💎 💎 💎 🍋
+Match: 4 Diamonds
+Payout: 500 × 20 = 10,000 coins
+Profit: +9,500 coins
+
+Example 3: JACKPOT!
+You bet: 1,000 coins
+Result: 🎰 🎰 🎰 🎰 🎰
+Match: 5 Jackpot symbols
+Payout: Current jackpot (e.g., 150,000 coins)
+Profit: +149,000 coins
+(Jackpot resets to 10,000 after win)
+
+Example 4: Loss
+You bet: 200 coins
+Result: 🍒 🍋 🍊 💎 🍒
+Match: None (no 3+ matching)
+Payout: 0 coins
+Loss: -200 coins
+
+PROGRESSIVE JACKPOT:
+- Starts at 10,000 coins
+- Grows by 5% of every bet placed
+- Shared across entire server
+- Announces winner in channel (auto-deletes after 5 min)
+- Resets to 10,000 after someone wins
+
+Example Jackpot Growth:
+Initial: 10,000 coins
+Player 1 bets 1,000 → Jackpot: 10,050 (10,000 + 50)
+Player 2 bets 2,000 → Jackpot: 10,150 (10,050 + 100)
+Player 3 bets 500  → Jackpot: 10,175 (10,150 + 25)
+... (continues growing)
+Player X hits jackpot → Wins 10,175 coins → Resets to 10,000
+
+BALANCE CHECKING:
+- Slots checks wallet + bank balance combined
+- You can play even with money in bank
+- Winnings always go to wallet
+- No need to withdraw to play
+
+GEAR BONUSES:
+Slot Magnet (shop item):
+- Increases payout by 8%
+- Example: 1,000 bet, Diamond win (20x)
+  - Normal: 20,000 coins
+  - With Magnet: 21,600 coins (+1,600 bonus)
+
+Lucky Charm (shop item):
+- Increases chance of better symbols
+- Slightly better odds on rare symbols
+
+STRATEGY TIPS:
+1. Start with small bets to learn
+2. Jackpot grows over time - wait for big jackpot
+3. Higher bets = bigger jackpot contribution
+4. Use Slot Magnet for high-value bets
+5. Set a loss limit (e.g., don't bet more than 10% of balance)
+6. Slots is pure luck - no skill involved
+7. House edge: ~10% (you lose on average)
+
+===========================================
+🃏 BLACKJACK GAME EXPLAINED
+===========================================
+
+COMMAND: /blackjack <bet_amount>
+
+HOW IT WORKS:
+1. You and dealer each get 2 cards
+2. Goal: Get closer to 21 than dealer (without going over)
+3. Choose to HIT (take card), STAND (keep hand), or DOUBLE DOWN
+4. Dealer hits on 16 or less, stands on 17+
+5. Closest to 21 wins!
+
+CARD VALUES:
+Number cards (2-10) → Face value
+Jack, Queen, King → 10
+Ace → 1 or 11 (whichever is better)
+
+ACTIONS:
+HIT - Take another card
+STAND - Keep your current hand
+DOUBLE DOWN - Double your bet, get exactly 1 more card, turn ends
+
+PAYOUTS:
+Win: 1:1 (bet $100, win $100)
+Blackjack (A + 10-value card): 3:2 (bet $100, win $150)
+Push (tie): Get bet back
+Bust (over 21): Lose bet
+Dealer busts: You win
+
+EXAMPLES:
+
+Example 1: Simple Win
+You bet: 500 coins
+Your cards: K♠ 7♥ (total: 17)
+Dealer shows: 6♦
+You: STAND (17 is decent)
+Dealer reveals: 6♦ 9♣ (15) → Hits → 10♠ (25 - BUST!)
+Result: Dealer busts, you WIN
+Payout: 500 + 500 = 1,000 coins
+
+Example 2: Blackjack!
+You bet: 1,000 coins
+Your cards: A♠ K♦ (BLACKJACK! = 21)
+Dealer shows: 8♥
+Dealer reveals: 8♥ 9♣ (17)
+Result: BLACKJACK WINS!
+Payout: 1,000 + 1,500 = 2,500 coins
+
+Example 3: Double Down Success
+You bet: 200 coins
+Your cards: 5♠ 6♥ (total: 11)
+Dealer shows: 6♦
+You: DOUBLE DOWN (good odds with 11)
+New bet: 400 coins (doubled)
+New card: 9♠ (total: 20)
+Dealer reveals: 6♦ 10♣ (16) → Hits → 8♠ (24 - BUST!)
+Result: You WIN with double bet
+Payout: 400 + 400 = 800 coins
+
+Example 4: Push (Tie)
+You bet: 300 coins
+Your cards: 10♠ 8♥ (18)
+You: STAND
+Dealer: 10♦ 8♣ (18)
+Result: PUSH (tie)
+Payout: 300 coins (bet returned)
+
+Example 5: Bust (Loss)
+You bet: 500 coins
+Your cards: 10♠ 7♥ (17)
+Dealer shows: K♦
+You: HIT (trying to beat dealer)
+New card: 8♠ (total: 25 - BUST!)
+Result: You LOSE (went over 21)
+Loss: -500 coins
+
+STRATEGY GUIDE:
+
+WHEN TO HIT:
+- You have 11 or less (can't bust)
+- You have 12-16 and dealer shows 7-Ace
+- Soft hands (with Ace) under 18
+
+WHEN TO STAND:
+- You have 17 or higher (hard total)
+- You have 12-16 and dealer shows 2-6 (dealer likely to bust)
+- Dealer showing weak card (4, 5, 6)
+
+WHEN TO DOUBLE DOWN:
+- You have 10 or 11 (good odds to get 20/21)
+- You have soft 16-18 and dealer shows 4-6
+- Never double on hard 12+ (too risky)
+
+DEALER PATTERNS:
+Dealer shows 2-6 → WEAK (likely to bust) → Stand on 12+
+Dealer shows 7-Ace → STRONG (likely good hand) → Hit until 17+
+
+GEAR BONUSES:
+Card Counter (shop item):
+- Shows hint about dealer's hidden card
+- Example: "Dealer likely has high card" or "Dealer has low card"
+
+Lucky Charm:
+- Slightly better card draws
+- Small edge over house
+
+ADVANCED TIPS:
+1. Basic strategy reduces house edge to ~0.5%
+2. Never take insurance (bad odds)
+3. Split aces and 8s (if feature added)
+4. Never split 10s or face cards
+5. Dealer has 30% bust rate with 4, 5, or 6 showing
+6. Blackjack (A+10) only on first 2 cards
+
+===========================================
+🪙 COINFLIP GAME EXPLAINED
+===========================================
+
+COMMAND: /coinflip <bet_amount> <heads/tails>
+
+HOW IT WORKS:
+1. Choose heads or tails
+2. Place your bet
+3. Coin flips
+4. Correct guess = 2x your bet
+5. Wrong guess = lose bet
+
+EXAMPLES:
+
+Example 1: Win
+You bet: 1,000 coins on HEADS
+Coin lands: HEADS
+Result: WIN!
+Payout: 1,000 × 2 = 2,000 coins
+Profit: +1,000 coins
+
+Example 2: Loss
+You bet: 500 coins on TAILS
+Coin lands: HEADS
+Result: LOSE
+Loss: -500 coins
+
+Example 3: Big Bet Win
+You bet: 10,000 coins on HEADS
+Coin lands: HEADS
+Result: WIN!
+Payout: 10,000 × 2 = 20,000 coins
+Profit: +10,000 coins
+
+GEAR BONUSES:
+Coin Doubler (shop item):
+- Doubles your winnings (4x total!)
+- Example: Bet 1,000, win with doubler
+  - Normal: 2,000 payout
+  - With doubler: 4,000 payout
+
+Lucky Charm:
+- Changes odds from 50/50 to ~55/45 in your favor
+- Small edge but adds up over time
+
+STRATEGY:
+1. Pure luck - no skill involved
+2. True 50/50 odds (fair)
+3. Good for quick gambling
+4. Use for double-or-nothing scenarios
+5. With Lucky Charm, slight edge over time
+
+===========================================
+💰 BANKROLL MANAGEMENT
+===========================================
+
+GOLDEN RULES:
+1. Never bet more than 10% of your total balance
+2. Set daily loss limits
+3. Take breaks after big wins/losses
+4. Use bank to protect profits
+5. Don't chase losses
+
+BETTING STRATEGIES:
+
+CONSERVATIVE (Low Risk):
+- Bet 1-5% of balance per game
+- Focus on blackjack with strategy
+- Avoid slots (high house edge)
+- Build slowly over time
+
+MODERATE (Medium Risk):
+- Bet 5-10% per game
+- Mix of all games
+- Use gear bonuses
+- Accept some losses
+
+AGGRESSIVE (High Risk):
+- Bet 10-20% per game
+- Chase jackpots
+- High variance plays
+- Can lose quickly
+
+EXAMPLE SESSION:
+
+Starting Balance: 10,000 coins
+Conservative Play (5% bets = 500 coins)
+
+Round 1: Blackjack, bet 500
+  Result: Win (+500)
+  Balance: 10,500
+
+Round 2: Slots, bet 500
+  Result: Loss (-500)
+  Balance: 10,000
+
+Round 3: Blackjack, bet 500
+  Result: Blackjack! (+750)
+  Balance: 10,750
+
+Round 4: Slots, bet 500
+  Result: Diamond win (+10,000)
+  Balance: 20,250
+
+STOP - Hit profit target, deposit in bank!
+
+===========================================
+📊 HOUSE EDGE & ODDS
+===========================================
+
+SLOTS:
+- House Edge: ~10%
+- Expected return: 90 cents per $1 bet
+- Jackpot odds: 0.1% (1 in 1,000)
+- Diamond odds: 2% (1 in 50)
+
+BLACKJACK:
+- House Edge: 0.5% (with perfect strategy)
+- Expected return: 99.5 cents per $1 bet
+- Blackjack odds: 4.8% (1 in 21 hands)
+- Best game for players!
+
+COINFLIP:
+- House Edge: 0% (with Lucky Charm: -5% player advantage!)
+- Expected return: $1 per $1 bet (fair)
+- Win odds: 50%
+
+===========================================
+🎁 CASINO GEAR GUIDE
+===========================================
+
+BEST GEAR FOR EACH GAME:
+
+SLOTS:
+1. Slot Magnet (8% payout boost)
+2. Lucky Charm (better symbols)
+Total investment: ~60,000 coins
+
+BLACKJACK:
+1. Card Counter (dealer hints)
+2. Lucky Charm (better cards)
+Total investment: ~75,000 coins
+
+COINFLIP:
+1. Coin Doubler (4x winnings!)
+2. Lucky Charm (55% win rate)
+Total investment: ~125,000 coins
+
+COST-BENEFIT:
+- Gear is permanent (one-time purchase)
+- Pays for itself over time
+- Essential for serious players
+
+===========================================
+🏆 CASINO ACHIEVEMENTS
+===========================================
+
+Track with /profile:
+- Total casino wins
+- Total casino losses
+- Biggest single win
+- Jackpot wins
+- Win streak
+- Current balance
+
+MILESTONES:
+Beginner: 10 wins
+Intermediate: 50 wins
+Advanced: 100 wins
+Pro: 500 wins
+Legend: 1,000 wins
+
+===========================================
+💡 PRO TIPS
+===========================================
+
+1. ALWAYS play blackjack with basic strategy
+2. Wait for big jackpots before playing slots
+3. Use /deposit after big wins (protect profits)
+4. Buy casino gear before serious playing
+5. Coinflip with Coin Doubler = best odds
+6. Never gamble your entire balance
+7. Set win goals and stop when reached
+8. Drink water, take breaks (stay sharp)
+9. Casino is entertainment, not income
+10. House always wins long-term (except coinflip with gear)
+
+===========================================
+❓ FAQ
+===========================================
+
+Q: Can I win long-term?
+A: Only with blackjack perfect strategy + gear. Slots always loses long-term.
+
+Q: What's the best game?
+A: Blackjack has lowest house edge (0.5%). Best for profit.
+
+Q: Should I buy casino gear?
+A: Yes! Pays for itself quickly if you play regularly.
+
+Q: What's the biggest possible win?
+A: Jackpot can grow infinitely (depends on server activity)
+
+Q: Can I get banned for winning too much?
+A: No! Wins are legitimate and celebrated.
+
+Q: Do casino stats affect anything?
+A: Just for tracking. No gameplay impact.
+
+===========================================
+
+Good luck at the tables! 🎰🃏🪙
+Remember: Gamble responsibly!

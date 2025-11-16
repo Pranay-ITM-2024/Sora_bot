@@ -1,0 +1,506 @@
+===========================================
+💰 ECONOMY SYSTEM - COMPLETE GUIDE
+===========================================
+
+Complete explanation of the economy system
+including wallet, bank, loans, and earnings.
+
+===========================================
+💵 WALLET SYSTEM
+===========================================
+
+WHAT IS IT?
+Your wallet holds "active" coins that you can
+spend immediately on purchases, bets, and heists.
+
+HOW TO CHECK:
+Command: /balance or /bal
+Shows: Wallet + Bank balance
+
+CHARACTERISTICS:
+✅ Instant access to funds
+✅ Use for all transactions
+✅ Visible to other players
+✅ Can be lost in heist penalties
+❌ No interest earned
+❌ Not protected from losses
+
+EXAMPLE:
+User types: /balance
+Bot shows:
+💰 Wallet: 5,250 coins
+🏦 Bank: 15,000 coins
+💵 Total: 20,250 coins
+
+===========================================
+🏦 BANK SYSTEM
+===========================================
+
+WHAT IS IT?
+Safe storage for coins that earns interest
+over time. Protected from some penalties.
+
+INTEREST RATE: 0.5% per 24 hours
+
+HOW IT WORKS:
+1. Deposit coins from wallet to bank
+2. Every 24 hours, interest auto-calculates
+3. Interest added directly to bank
+4. Compounds over time (interest on interest)
+
+COMMANDS:
+/deposit <amount> - Move wallet → bank
+/withdraw <amount> - Move bank → wallet
+
+EXAMPLES:
+
+Example 1: Simple Deposit
+Wallet: 10,000 coins
+Command: /deposit 8000
+Result:
+  Wallet: 2,000 coins
+  Bank: 8,000 coins
+
+Example 2: Interest Earning
+Day 1: Bank = 10,000 coins
+Day 2: Bank = 10,050 coins (+50 interest)
+Day 3: Bank = 10,100.25 coins (+50.25 interest)
+Day 4: Bank = 10,150.75 coins (+50.50 interest)
+
+After 30 days: 10,000 → 10,151 coins
+After 1 year: 10,000 → 18,431 coins
+
+Example 3: Compound Growth
+Starting: 50,000 in bank
+After 7 days: 50,175 (+175)
+After 30 days: 50,756 (+756)
+After 90 days: 52,283 (+2,283)
+After 365 days: 92,155 (+42,155!)
+
+STRATEGIES:
+1. Keep 20% in wallet for daily use
+2. Deposit 80% for interest growth
+3. Withdraw only when needed
+4. Long-term growth beats gambling
+5. Compound interest = passive income
+
+===========================================
+💸 EARNING COINS
+===========================================
+
+METHOD 1: DAILY REWARDS
+Command: /daily
+Cooldown: 24 hours
+Amount: Configurable (default 100 coins)
+Goes to: Wallet
+
+Example:
+Day 1: /daily → +100 coins
+Day 2: /daily → +100 coins
+Day 3: /daily → +100 coins
+Weekly total: 700 coins FREE
+
+METHOD 2: WEEKLY REWARDS
+Command: /weekly
+Cooldown: 7 days
+Amount: Configurable (default 500 coins)
+Goes to: Wallet
+
+Example:
+Week 1: /weekly → +500 coins
+Week 2: /weekly → +500 coins
+Month total: ~2,000 coins FREE
+
+METHOD 3: CASINO GAMES
+Risk: Medium-High
+Potential: High returns or total loss
+Commands: /slots, /blackjack, /coinflip
+
+Example Session:
+Starting: 5,000 coins
+10x Blackjack wins: +5,000
+5x Slot losses: -2,500
+1x Jackpot: +50,000
+Ending: 57,500 coins (+52,500)
+
+METHOD 4: HEISTS
+Risk: Medium (solo) / Low (multiplayer)
+Potential: High returns with gear
+Commands: /soloheist, /heist
+
+Example Solo Heist:
+Target: 50,000 coins
+Gear bonuses: +30%
+Success: +65,000 coins (50k + 15k bonus)
+Failure: -15,000 coins (30% penalty)
+
+Example Multiplayer Heist:
+Team of 5, Target: 200,000
+Your share: 40,000 coins
+With bonuses: 52,000 coins
+Risk: Shared penalty if fail
+
+METHOD 5: GUILD INTEREST
+Risk: None
+Potential: Passive income
+Requirement: Be in guild, contribute
+
+Example:
+Your contribution: 30,000 coins
+Guild bank total: 100,000 coins
+Your share: 30%
+Guild interest: 500 coins/day
+Your cut: 150 coins/day automatically
+
+METHOD 6: RAT RACE BETTING
+Risk: Medium (if bet on favorites)
+Potential: 2x to 10x returns
+Wait for announcements
+
+Example:
+Bet: 5,000 on Rat #3 (4:1 odds)
+Rat #3 wins
+Payout: 5,000 × 4 = 20,000 coins
+Profit: +15,000 coins
+
+METHOD 7: MARKET TRADING
+Risk: Low-Medium
+Potential: 50-200% profits
+Requires patience
+
+Example:
+Buy Gold Bar: 500 coins (LOW price)
+Wait 2 hours
+Sell Gold Bar: 1,400 coins (HIGH price)
+Profit per bar: +900 coins
+10 bars: +9,000 coins profit
+
+===========================================
+📊 OPTIMAL EARNING STRATEGY
+===========================================
+
+PHASE 1: BEGINNER (0-50k coins)
+Daily routine:
+1. /daily (100 coins)
+2. Deposit all in bank
+3. Let interest grow
+4. /weekly every 7 days (500 coins)
+5. Save for first heist gear
+
+Time: 2-3 weeks
+Result: 50,000 coins saved
+
+PHASE 2: GROWTH (50k-500k coins)
+Daily routine:
+1. /daily + /weekly
+2. 1-2 solo heists (stealth approach)
+3. Safe casino bets (blackjack)
+4. 80% of profits to bank
+5. Join/create guild
+
+Time: 1-2 months
+Result: 500,000 coins
+
+PHASE 3: WEALTHY (500k+ coins)
+Daily routine:
+1. /daily + /weekly
+2. Multiplayer heists with team
+3. Bigger casino bets with gear
+4. Market trading
+5. Guild leadership
+6. Interest becomes major income
+
+Time: Ongoing
+Result: Millions possible
+
+===========================================
+💳 LOAN SYSTEM
+===========================================
+
+WHAT ARE LOANS?
+Borrow coins now, pay back with interest
+over time through EMI (installments).
+
+COMMAND: /takeloan <amount>
+
+HOW IT WORKS:
+1. Request loan amount
+2. System calculates:
+   - Interest rate (10%)
+   - Total repayment amount
+   - EMI (weekly payment)
+   - Number of payments
+3. Approve and get coins instantly
+4. Pay back with /payloan
+
+LOAN TERMS:
+Loan Amount: 1,000 - 1,000,000 coins
+Interest Rate: 10% total
+Payment Period: 4 weeks (4 EMIs)
+EMI: Total amount ÷ 4
+
+EXAMPLES:
+
+Example 1: Small Loan
+Loan: 10,000 coins
+Interest: 1,000 (10%)
+Total owed: 11,000 coins
+EMI: 2,750 coins/week
+Duration: 4 weeks
+
+Week 1: /payloan → Pay 2,750
+Week 2: /payloan → Pay 2,750
+Week 3: /payloan → Pay 2,750
+Week 4: /payloan → Pay 2,750
+Total paid: 11,000 coins
+
+Example 2: Large Loan
+Loan: 100,000 coins
+Interest: 10,000 (10%)
+Total owed: 110,000 coins
+EMI: 27,500 coins/week
+Duration: 4 weeks
+
+Example 3: Early Payoff
+Loan: 50,000 coins
+Total owed: 55,000 coins
+After 1 week: Outstanding = 41,250
+
+You pay full amount: /payloan 41250
+Loan cleared! Save interest!
+
+Example 4: Overpayment Protection
+Outstanding: 5,000 coins
+You try to pay: 10,000 coins
+System charges: 5,000 only
+Refunds: 5,000 (not charged)
+Message: "Overpayment Refunded"
+
+PENALTIES:
+Missed payment: +5% penalty
+Example: Miss EMI of 2,750
+New amount: 2,750 + 137.5 = 2,887.5
+
+LOAN STRATEGY:
+✅ GOOD uses:
+- Buy essential heist gear
+- Emergency casino gear purchase
+- Market opportunity (buy low)
+- Multiplayer heist entry
+
+❌ BAD uses:
+- Gambling in casino
+- Risky solo heists
+- Impulse purchases
+- Already have debt
+
+PAYING BACK:
+Command: /payloan [amount]
+No amount = pays EMI
+Custom amount = pays that much
+
+Tips:
+1. Pay more than EMI to finish early
+2. Pay from wallet first, then bank
+3. Can't overpay (auto-refunds excess)
+4. Check with /loaninfo
+
+===========================================
+🏛️ GUILD ECONOMY
+===========================================
+
+WHAT IS GUILD BANK?
+Shared bank account for guild members
+that earns interest and splits rewards.
+
+GUILD COMMANDS:
+/guild create <name> - Start guild
+/guild join <name> - Join existing
+/guild_deposit <amount> - Add to guild bank
+/guild_withdraw <amount> - Take from guild bank
+/gshare - View contribution breakdown
+
+HOW GUILD INTEREST WORKS:
+1. Guild bank earns 0.5% per 24 hours
+2. Interest distributed by contribution %
+3. Your cut goes directly to YOUR wallet
+4. Automatic daily payout
+
+EXAMPLE GUILD ECONOMY:
+
+GUILD: "Legends"
+Members: 5
+Total Bank: 200,000 coins
+
+CONTRIBUTIONS:
+Leader: 80,000 (40%)
+Member1: 60,000 (30%)
+Member2: 40,000 (20%)
+Member3: 15,000 (7.5%)
+Member4: 5,000 (2.5%)
+
+DAILY INTEREST: 1,000 coins
+
+PAYOUT:
+Leader: 400 coins (40%)
+Member1: 300 coins (30%)
+Member2: 200 coins (20%)
+Member3: 75 coins (7.5%)
+Member4: 25 coins (2.5%)
+
+MONTHLY EARNINGS:
+Leader: 12,000 coins
+Member1: 9,000 coins
+Member2: 6,000 coins
+Member3: 2,250 coins
+Member4: 750 coins
+
+GUILD STRATEGY:
+1. Contribute regularly
+2. Higher contribution = more interest
+3. Don't withdraw unnecessarily
+4. Compound guild growth
+5. Coordinate with team
+
+CONTRIBUTION TRACKING:
+Deposits: Increase your share
+Withdrawals: Decrease your share
+Formula: Your share = Your contribution ÷ Total
+
+Example:
+You deposit 10,000
+Guild bank: 50,000 → 60,000
+Your contribution: 0 → 10,000
+Your share: 0% → 16.67%
+
+===========================================
+📈 WEALTH BUILDING ROADMAP
+===========================================
+
+MONTH 1: Foundation
+Goal: 50,000 coins
+Method:
+- Daily/weekly religiously
+- All to bank
+- No gambling
+- No loans
+Daily time: 2 minutes
+
+MONTH 2: Equipment
+Goal: 150,000 coins
+Method:
+- Daily/weekly
+- Buy heist gear
+- Safe solo heists
+- Bank most profits
+Daily time: 15 minutes
+
+MONTH 3: Operations
+Goal: 500,000 coins
+Method:
+- Join guild
+- Multiplayer heists
+- Strategic casino
+- Market trading
+Daily time: 30 minutes
+
+MONTH 4+: Empire
+Goal: 1,000,000+ coins
+Method:
+- Lead guild
+- Big heists
+- Advanced strategies
+- Interest = major income
+Daily time: 1 hour
+
+===========================================
+💡 ECONOMY PRO TIPS
+===========================================
+
+1. Time = Money
+   Let bank interest compound
+   Don't rush to spend
+
+2. Risk Management
+   Never gamble what you can't lose
+   Keep emergency funds in bank
+
+3. Diversify Income
+   Mix passive (interest) + active (heists)
+   Don't rely on one method
+
+4. Community Wealth
+   Strong guild = better for everyone
+   Help newer players
+
+5. Long-term Thinking
+   10,000 today → 18,431 in 1 year (bank)
+   Patience beats gambling
+
+6. Leverage Smart
+   Loans for gear = good
+   Loans for casino = bad
+
+7. Track Progress
+   Use /profile to see growth
+   Celebrate milestones
+
+8. Opportunity Cost
+   Spending 50,000 on chest = losing 91,525 in 1 year interest
+   Choose wisely
+
+===========================================
+📊 ECONOMY CALCULATIONS
+===========================================
+
+INTEREST FORMULA:
+Daily interest = Balance × 0.005
+Yearly interest = Balance × 1.8431 (84.31% APY)
+
+LOAN CALCULATOR:
+Loan amount × 1.10 = Total owed
+Total owed ÷ 4 = Weekly EMI
+
+COMPOUND INTEREST:
+Year 1: 10,000 → 18,431
+Year 2: 18,431 → 33,967
+Year 3: 33,967 → 62,607
+Year 4: 62,607 → 115,435
+
+BREAK-EVEN CASINO:
+Need >50% win rate blackjack
+Need >0.1% jackpot rate slots
+Coinflip with gear = +EV
+
+===========================================
+❓ ECONOMY FAQ
+===========================================
+
+Q: What's the fastest way to get rich?
+A: Heists with gear + bank compound interest
+
+Q: Should I keep money in wallet or bank?
+A: 80% bank, 20% wallet
+
+Q: Are loans worth it?
+A: Only for purchasing profitable gear
+
+Q: How long to reach 1 million?
+A: 3-6 months with daily play
+
+Q: Can I lose coins in bank?
+A: Not from interest, but some penalties may deduct
+
+Q: Best use of 100,000 coins?
+A: Buy full heist gear set
+
+Q: Why join a guild?
+A: Extra interest + teamwork benefits
+
+Q: Do I need to claim interest?
+A: No, it's automatic every 24 hours
+
+===========================================
+
+Master the economy, build your empire! 💰
+Start today with /daily and /deposit!

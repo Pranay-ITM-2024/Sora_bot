@@ -1,0 +1,639 @@
+===========================================
+🏛️ GUILD SYSTEM - COMPLETE GUIDE
+===========================================
+
+Master guide to guilds including creation,
+management, contributions, and strategies.
+
+===========================================
+🏛️ WHAT ARE GUILDS?
+===========================================
+
+Guilds are player-formed groups that share
+a common bank account, earn interest together,
+and coordinate for mutual benefit.
+
+BENEFITS:
+✅ Shared guild bank with interest
+✅ Interest distributed by contribution
+✅ Teamwork and coordination
+✅ Social connections
+✅ Multiplayer heist teams
+✅ Passive income from contributions
+
+LIMITATIONS:
+❌ Server-specific (can't cross servers)
+❌ No guild vs guild features (yet)
+❌ Leader controls most decisions
+
+===========================================
+🎯 GUILD COMMANDS
+===========================================
+
+/guild - View guild menu and options
+/guild create <name> - Create new guild
+/guild join <name> - Join existing guild
+/guild leave - Leave current guild
+/guild info - View guild statistics
+/guild_deposit <amount> - Add coins to guild bank
+/guild_withdraw <amount> - Take from guild bank
+/guild_transfer <member> - Transfer ownership (dropdown)
+/gshare - View contribution breakdown
+
+===========================================
+🏗️ CREATING A GUILD
+===========================================
+
+COMMAND: /guild create <name>
+
+REQUIREMENTS:
+- Must NOT be in a guild already
+- Name must be unique on server
+- Name: 3-20 characters
+- No special characters
+
+PROCESS:
+1. Type /guild create [name]
+2. Guild created instantly
+3. You become Leader (owner)
+4. Guild bank starts at 0 coins
+5. Invite others to join
+
+EXAMPLES:
+
+Example 1: Simple Creation
+Command: /guild create Warriors
+Result: ✅ Guild "Warriors" created!
+You are the Leader.
+Members: 1 (you)
+Guild Bank: 0 coins
+
+Example 2: Failed Creation (already in guild)
+You're in guild: "Legends"
+Command: /guild create Champions
+Result: ❌ You're already in a guild!
+Must leave current guild first.
+
+Example 3: Failed Creation (name taken)
+Command: /guild create Elite
+Result: ❌ Guild "Elite" already exists!
+Try a different name.
+
+===========================================
+👥 JOINING A GUILD
+===========================================
+
+COMMAND: /guild join <name>
+
+REQUIREMENTS:
+- Must NOT be in a guild
+- Guild must exist
+- Guild must have space
+
+PROCESS:
+1. Type /guild join [name]
+2. Instantly joined
+3. Start with 0% contribution
+4. Can deposit/withdraw based on rules
+
+EXAMPLES:
+
+Example 1: Successful Join
+Command: /guild join Warriors
+Result: ✅ You joined guild "Warriors"!
+Leader: @PlayerX
+Members: 5
+Guild Bank: 150,000 coins
+
+Example 2: Failed Join (already in guild)
+Current guild: "Legends"
+Command: /guild join Warriors
+Result: ❌ Leave your current guild first!
+Use /guild leave
+
+===========================================
+📤 LEAVING A GUILD
+===========================================
+
+COMMAND: /guild leave
+
+EFFECTS:
+- You leave the guild
+- Your contribution stays in guild bank
+- You don't take any coins with you
+- If you're leader, guild disbands (or transfer first)
+
+EXAMPLES:
+
+Example 1: Member Leaving
+You're in guild: "Warriors"
+Your contribution: 10,000 coins
+Command: /guild leave
+Result: ✅ You left guild "Warriors"
+Guild bank keeps your 10,000 contribution
+
+Example 2: Leader Leaving
+You're Leader of "Warriors"
+Guild bank: 200,000 coins
+Command: /guild leave
+Result: ❌ Transfer ownership first!
+Use /guild_transfer to assign new leader
+
+===========================================
+💰 GUILD BANK SYSTEM
+===========================================
+
+HOW IT WORKS:
+- Shared bank for all members
+- Earns 0.5% interest per 24 hours
+- Interest distributed by contribution %
+- Members deposit/withdraw freely
+- Contributions tracked individually
+
+GUILD INFO:
+Command: /guild info
+Shows:
+- Guild name
+- Leader name
+- Total members
+- Guild bank balance
+- Daily interest amount
+- Your contribution
+- Your share %
+
+EXAMPLE GUILD INFO:
+
+🏛️ Guild: "Elite Squad"
+👑 Leader: @PlayerOne
+👥 Members: 7
+💰 Guild Bank: 500,000 coins
+📈 Daily Interest: 2,500 coins
+🎯 Your Contribution: 80,000 coins (16%)
+💵 Your Daily Cut: 400 coins
+
+===========================================
+📥 DEPOSITING TO GUILD BANK
+===========================================
+
+COMMAND: /guild_deposit <amount>
+
+HOW IT WORKS:
+1. Amount taken from your wallet
+2. Added to guild bank
+3. Your contribution increases
+4. Your share % updates
+5. Future interest reflects new share
+
+EXAMPLES:
+
+Example 1: First Deposit
+Guild Bank: 100,000 coins
+Your contribution: 0 (0%)
+Command: /guild_deposit 20000
+
+Result:
+Guild Bank: 120,000 coins (+20,000)
+Your contribution: 20,000 (16.67%)
+Your daily interest: 208 coins
+
+Example 2: Adding More
+Guild Bank: 120,000 coins
+Your contribution: 20,000 (16.67%)
+Command: /guild_deposit 30000
+
+Result:
+Guild Bank: 150,000 coins (+30,000)
+Your contribution: 50,000 (33.33%)
+Your daily interest: 500 coins
+
+Example 3: Insufficient Funds
+Wallet: 5,000 coins
+Command: /guild_deposit 10000
+Result: ❌ Insufficient funds!
+You need 10,000 but have only 5,000
+
+===========================================
+📤 WITHDRAWING FROM GUILD BANK
+===========================================
+
+COMMAND: /guild_withdraw <amount>
+
+HOW IT WORKS:
+1. Amount removed from guild bank
+2. Added to your wallet
+3. Your contribution decreases proportionally
+4. Your share % updates
+5. Future interest reflects new share
+
+OVERPAYMENT PROTECTION:
+If you withdraw more than you contributed,
+system only lets you take your contribution amount.
+
+EXAMPLES:
+
+Example 1: Partial Withdrawal
+Guild Bank: 150,000 coins
+Your contribution: 50,000 (33.33%)
+Command: /guild_withdraw 20000
+
+Result:
+Guild Bank: 130,000 coins (-20,000)
+Your contribution: 30,000 (23.08%)
+Wallet: +20,000 coins
+
+Example 2: Full Withdrawal
+Guild Bank: 150,000 coins
+Your contribution: 50,000 (33.33%)
+Command: /guild_withdraw 50000
+
+Result:
+Guild Bank: 100,000 coins (-50,000)
+Your contribution: 0 (0%)
+Wallet: +50,000 coins
+No more interest share!
+
+Example 3: Over-Withdrawal Attempt
+Guild Bank: 150,000 coins
+Your contribution: 20,000
+Command: /guild_withdraw 50000
+
+Result:
+❌ You can only withdraw up to 20,000 coins
+(your contribution amount)
+
+===========================================
+💵 GUILD INTEREST SYSTEM
+===========================================
+
+INTEREST RATE: 0.5% per 24 hours
+
+HOW IT'S CALCULATED:
+1. Guild bank balance × 0.005 = Total interest
+2. Each member gets: Total × (Their % share)
+3. Payout goes directly to member's wallet
+4. Automatic every 24 hours
+
+CONTRIBUTION SHARE:
+Your % = Your contribution ÷ Total guild bank × 100
+
+EXAMPLES:
+
+Example 1: Simple Split
+
+GUILD BANK: 100,000 coins
+
+CONTRIBUTIONS:
+Leader: 60,000 (60%)
+Member1: 30,000 (30%)
+Member2: 10,000 (10%)
+
+DAILY INTEREST: 500 coins
+
+PAYOUT:
+Leader: 300 coins (60%)
+Member1: 150 coins (30%)
+Member2: 50 coins (10%)
+
+MONTHLY EARNINGS:
+Leader: 9,000 coins
+Member1: 4,500 coins
+Member2: 1,500 coins
+
+Example 2: Growing Guild
+
+DAY 1:
+Guild Bank: 50,000
+Leader contribution: 50,000 (100%)
+Interest: 250 coins → Leader gets 250
+
+DAY 5:
+Member joins, deposits 25,000
+Guild Bank: 75,250
+Leader: 50,000 (66.5%)
+Member: 25,000 (33.5%)
+Interest: 376 coins
+Leader gets: 250 coins
+Member gets: 126 coins
+
+DAY 30:
+Guild Bank: 110,000 (grown from interest + deposits)
+Interest split continues based on contributions
+
+Example 3: Changing Shares
+
+INITIAL:
+Guild Bank: 200,000
+Your contribution: 40,000 (20%)
+Daily interest: 1,000
+Your cut: 200 coins
+
+YOU DEPOSIT 60,000:
+Guild Bank: 260,000
+Your contribution: 100,000 (38.46%)
+Daily interest: 1,300
+Your cut: 500 coins (+250%)
+
+===========================================
+👑 GUILD LEADERSHIP
+===========================================
+
+LEADER POWERS:
+- Full bank access (deposit/withdraw)
+- Can transfer ownership
+- Symbolic leadership (no special powers otherwise)
+
+LEADER RESPONSIBILITIES:
+- Manage guild bank wisely
+- Coordinate heists
+- Recruit members
+- Fair distribution
+
+TRANSFERRING OWNERSHIP:
+Command: /guild_transfer
+
+PROCESS:
+1. Leader types /guild_transfer
+2. Dropdown shows all guild members
+3. Leader selects new leader
+4. Confirmation required
+5. Ownership transfers
+6. Old leader becomes regular member
+
+EXAMPLE:
+
+Current Leader: You
+Guild: "Warriors"
+Command: /guild_transfer
+
+Dropdown shows:
+- Member1
+- Member2
+- Member3
+
+Select: Member1
+Confirm: Yes
+
+Result:
+New Leader: Member1
+You: Regular member
+All roles switched!
+
+===========================================
+📊 CONTRIBUTION TRACKING
+===========================================
+
+COMMAND: /gshare
+
+Shows detailed breakdown of who contributed
+how much and their interest share.
+
+EXAMPLE OUTPUT:
+
+🏛️ Guild: "Elite Squad"
+💰 Total Bank: 500,000 coins
+📈 Daily Interest: 2,500 coins
+
+📊 CONTRIBUTION SHARES:
+
+1. @Leader - 200,000 coins (40%)
+   Daily interest: 1,000 coins
+
+2. @Member1 - 150,000 coins (30%)
+   Daily interest: 750 coins
+
+3. @Member2 - 100,000 coins (20%)
+   Daily interest: 500 coins
+
+4. @Member3 - 50,000 coins (10%)
+   Daily interest: 250 coins
+
+---
+Your contribution: 150,000 coins (30%)
+Your daily interest: 750 coins
+Your monthly interest: ~22,500 coins
+
+===========================================
+💡 GUILD STRATEGIES
+===========================================
+
+STRATEGY 1: "Equal Partners"
+All members contribute equally
+Example: 5 members × 20,000 = 100,000 bank
+Everyone gets equal interest (20% each)
+Fair and democratic
+
+STRATEGY 2: "Leader Heavy"
+Leader contributes 60-70%
+Members contribute 10-15% each
+Leader gets most interest
+Good for established players helping newcomers
+
+STRATEGY 3: "Slow Build"
+Start small (everyone deposits 5k)
+Guild bank: 25,000 (5 members)
+Each week, everyone adds 5k more
+Grows together over time
+
+STRATEGY 4: "Investment Club"
+Target: 1,000,000 guild bank
+Members compete to increase share
+Highest contributor gets leadership
+Drives growth through competition
+
+STRATEGY 5: "Heist Fund"
+Guild bank used for team heists
+Profits split and redeposited
+Compound growth through heisting
+
+===========================================
+🎯 GUILD BEST PRACTICES
+===========================================
+
+FOR LEADERS:
+1. Lead by example (contribute most)
+2. Don't withdraw selfishly
+3. Organize heist teams
+4. Welcome new members
+5. Transfer ownership if inactive
+
+FOR MEMBERS:
+1. Contribute regularly
+2. Don't withdraw unless needed
+3. Participate in heists
+4. Communicate with team
+5. Respect guild bank
+
+FOR EVERYONE:
+1. Guild bank > personal bank (higher social trust)
+2. Contribute = compound interest
+3. Coordinate heists with guild
+4. Use voice chat for planning
+5. Celebrate milestones together
+
+===========================================
+📈 GUILD GROWTH EXAMPLES
+===========================================
+
+Example 1: "Legends Guild" - Month 1
+
+Week 1:
+5 members join, each deposits 10,000
+Guild Bank: 50,000
+Daily interest: 250 coins
+
+Week 2:
+Everyone deposits another 10,000
+Guild Bank: 102,500 (50k + 10k×5 + interest)
+Daily interest: 512 coins
+
+Week 3:
+Everyone deposits 10,000 again
+Guild Bank: 156,584
+Daily interest: 782 coins
+
+Week 4:
+Everyone deposits 10,000 final time
+Guild Bank: 212,052
+Daily interest: 1,060 coins
+
+Month 1 Total: 212,052 coins
+Each member's contribution: 40,000
+Each member's share: 20%
+Each member's daily passive: 212 coins
+
+Example 2: "Warriors Guild" - Month 3
+
+Starting (Month 1): 200,000 guild bank
+Month 2: 420,000 (members kept contributing)
+Month 3: 680,000 (compound interest + deposits)
+
+Leader contribution: 280,000 (41%)
+Daily interest: 3,400
+Leader's cut: 1,394 coins/day
+Leader's monthly: ~41,820 coins
+
+That's MORE than original contribution in passive income!
+
+===========================================
+🏆 GUILD ACHIEVEMENTS
+===========================================
+
+MILESTONES:
+
+Startup Guild: 50,000 bank
+Growing Guild: 100,000 bank
+Established Guild: 250,000 bank
+Wealthy Guild: 500,000 bank
+Elite Guild: 1,000,000 bank
+Legendary Guild: 5,000,000 bank
+
+MEMBER GOALS:
+
+Contributor: 10,000 contribution
+Supporter: 50,000 contribution
+Benefactor: 100,000 contribution
+Patron: 500,000 contribution
+Legend: 1,000,000 contribution
+
+===========================================
+❓ GUILD FAQ
+===========================================
+
+Q: Can I be in multiple guilds?
+A: No, one guild per server
+
+Q: What happens to my contribution if I leave?
+A: It stays in guild bank (you forfeit it)
+
+Q: Can leader kick members?
+A: Not currently, members must leave voluntarily
+
+Q: Is there a member limit?
+A: No, unlimited members
+
+Q: Can guilds raid each other?
+A: Not currently implemented
+
+Q: Do I have to contribute?
+A: No, but you get 0% interest if you don't
+
+Q: Can I see other members' contributions?
+A: Yes, /gshare shows everyone's
+
+Q: What if leader goes inactive?
+A: Members should ask for /guild_transfer or leave
+
+Q: Best guild size?
+A: 5-10 members for coordination
+
+Q: Can I have guild name with spaces?
+A: Yes! "Elite Squad" works fine
+
+===========================================
+💡 GUILD PRO TIPS
+===========================================
+
+1. EARLY CONTRIBUTION = COMPOUND GAINS
+   Deposit early, let it grow
+   Your 50k today = 92k in 1 year
+
+2. DON'T WITHDRAW FRIVOLOUSLY
+   Every withdrawal reduces future interest
+   Only withdraw for essential purchases
+
+3. COORDINATE HEISTS
+   Guild members = best heist teammates
+   Share rewards, redeposit profits
+
+4. RECRUIT ACTIVELY
+   More members = more contributions
+   More contributions = more interest
+
+5. SET GUILD GOALS
+   "Let's hit 100k bank this month"
+   "Everyone deposit 5k weekly"
+   Goals drive engagement
+
+6. COMMUNICATION IS KEY
+   Discord server for guild
+   Plan heists together
+   Celebrate wins
+
+7. FAIR LEADERSHIP
+   Don't hoard all interest
+   Share opportunities
+   Transfer if going inactive
+
+8. PATIENCE PAYS
+   Guild bank = long-term investment
+   Compound interest = exponential growth
+   Stick with it!
+
+===========================================
+📊 GUILD MATH
+===========================================
+
+INTEREST CALCULATION:
+Daily = Bank × 0.005
+Monthly = Bank × 0.15 (approx)
+Yearly = Bank × 1.8431 (84.31% APY)
+
+CONTRIBUTION VALUE:
+Your 10,000 contribution = 50 coins/day
+Your 50,000 contribution = 250 coins/day
+Your 100,000 contribution = 500 coins/day
+
+BREAK-EVEN:
+100,000 contribution = 500/day
+After 200 days: 100,000 coins earned back
+After that: Pure profit!
+
+COMPOUND GUILD:
+Year 1: 100,000 → 184,310
+Year 2: 184,310 → 339,670
+Year 3: 339,670 → 626,070
+
+===========================================
+
+Build your empire together! 🏛️
+Create or join a guild with /guild today!
