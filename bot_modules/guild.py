@@ -297,7 +297,7 @@ class DepositModal(discord.ui.Modal, title="💰 Guild Bank Deposit"):
         server_data["guilds"][self.guild_name]["bank"] = server_data["guilds"][self.guild_name].get("bank", 0) + deposit_amount
         
         save_server_data(data, self.discord_guild_id, server_data)
-        await save_data(data)
+        await save_data(data, force=True)
 
         embed = discord.Embed(
             title="🏦 Guild Bank Deposit",
@@ -379,7 +379,7 @@ class WithdrawModal(discord.ui.Modal, title="💸 Guild Bank Withdrawal"):
         server_data["coins"][user_id] = server_data["coins"].get(user_id, 0) + withdraw_amount
         
         save_server_data(data, self.discord_guild_id, server_data)
-        await save_data(data)
+        await save_data(data, force=True)
 
         embed = discord.Embed(
             title="🏦 Guild Bank Withdrawal",
