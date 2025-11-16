@@ -182,7 +182,7 @@ SHOP_ITEMS = {
         },
         {
             "key": "silent_shoes",
-            "name": "� Silent Shoes",
+            "name": "👟 Silent Shoes",
             "price": 15000,
             "desc": "-20% noise generation (permanent)",
             "rarity": "Rare",
@@ -192,7 +192,7 @@ SHOP_ITEMS = {
         },
         {
             "key": "cloaking_device",
-            "name": "�️ Cloaking Device",
+            "name": "🌫️ Cloaking Device",
             "price": 50000,
             "desc": "-30% visibility (permanent)",
             "rarity": "Legendary",
@@ -222,7 +222,7 @@ SHOP_ITEMS = {
         },
         {
             "key": "turbo_boots",
-            "name": "� Turbo Boots",
+            "name": "👢 Turbo Boots",
             "price": 25000,
             "desc": "+20% movement speed (permanent)",
             "rarity": "Epic",
@@ -594,19 +594,29 @@ class ShopView(discord.ui.View):
         
         user_coins = server_data.get("coins", {}).get(self.user_id, 0)
         
+        items = SHOP_ITEMS[category_name]
+        item_count = len(items)
+        
         embed = discord.Embed(
             title=f"{category_name}",
-            description=f"**Balance:** {user_coins:,} coins\n\n🛒 **Select an item from the dropdown below to buy:**",
+            description=f"**Balance:** {user_coins:,} coins | **Items:** {item_count}\n\n🛒 **Select an item from the dropdown below to buy:**",
             color=0x3498db
         )
         
-        items = SHOP_ITEMS[category_name]
-        for item in items:
+        # Discord has a 25 field limit, so we'll show items up to that limit
+        for idx, item in enumerate(items[:24]):  # Leave 1 field for safety
             can_afford = "✅" if user_coins >= item['price'] else "❌"
             rarity_emoji = {"Common": "⚪", "Rare": "🔵", "Epic": "🟣", "Legendary": "🟡"}.get(item.get('rarity', 'Common'), "⚪")
             embed.add_field(
                 name=f"{can_afford} {item['name']} - {item['price']:,} coins",
-                value=f"{rarity_emoji} {item['rarity']} | {item['desc']}",
+                value=f"{rarity_emoji} {item.get('rarity', 'Common')} | {item['desc'][:100]}",
+                inline=False
+            )
+        
+        if item_count > 24:
+            embed.add_field(
+                name="📋 More Items",
+                value=f"Use the dropdown below to see all {item_count} items!",
                 inline=False
             )
         
