@@ -84,27 +84,32 @@ class InventoryView(discord.ui.View):
 
     def get_item_category(self, item_key, shop_items):
         """Determine item category"""
-        for category, items in shop_items.items():
-            if item_key in items or any(item_key in sub_items for sub_items in items.values() if isinstance(sub_items, dict)):
-                return category
+        from .shop import SHOP_ITEMS
+        for category, items in SHOP_ITEMS.items():
+            if isinstance(items, list):
+                for item in items:
+                    if item.get("key") == item_key:
+                        return category
         return "unknown"
 
     def get_item_name(self, item_key, shop_items):
         """Get display name for item"""
-        for category in shop_items.values():
-            if isinstance(category, dict):
-                for items in category.values():
-                    if isinstance(items, dict) and item_key in items:
-                        return items[item_key].get("name", item_key.replace('_', ' ').title())
+        from .shop import SHOP_ITEMS
+        for category, items in SHOP_ITEMS.items():
+            if isinstance(items, list):
+                for item in items:
+                    if item.get("key") == item_key:
+                        return item.get("name", item_key.replace('_', ' ').title())
         return item_key.replace('_', ' ').title()
 
     def get_item_rarity(self, item_key, shop_items):
         """Get item rarity"""
-        for category in shop_items.values():
-            if isinstance(category, dict):
-                for items in category.values():
-                    if isinstance(items, dict) and item_key in items:
-                        return items[item_key].get("rarity", "Common")
+        from .shop import SHOP_ITEMS
+        for category, items in SHOP_ITEMS.items():
+            if isinstance(items, list):
+                for item in items:
+                    if item.get("key") == item_key:
+                        return item.get("rarity", "Common")
         return "Common"
 
     def get_category_emoji(self, category):
@@ -159,14 +164,12 @@ class UseItemView(discord.ui.View):
         # Find item in shop
         from .shop import SHOP_ITEMS
         item_data = None
-        for category, items in SHOP_ITEMS.items():
-            if "Potions" in category:
-                for shop_item in items:
-                    if shop_item["key"] == item_key:
-                        item_data = shop_item
-                        break
-            if item_data:
-                break
+        # SHOP_ITEMS is now a dict with list values
+        if "🧪 Potions" in SHOP_ITEMS:
+            for shop_item in SHOP_ITEMS["🧪 Potions"]:
+                if shop_item["key"] == item_key:
+                    item_data = shop_item
+                    break
         
         if not item_data:
             await interaction.response.edit_message(content="❌ Item data not found!", view=None)
@@ -334,15 +337,15 @@ class Inventory(commands.Cog):
             if quantity > 0:
                 # Check if it's a consumable (potion)
                 found = False
-                for category, items in SHOP_ITEMS.items():
-                    if "Potions" in category:
-                        for shop_item in items:
-                            if shop_item["key"] == item_key:
-                                consumables.append((item_key, shop_item["name"], quantity))
-                                found = True
-                                break
-                    if found:
-                        break
+                # SHOP_ITEMS is now a dict with list values
+                if "🧪 Potions" in SHOP_ITEMS:
+                    for shop_item in SHOP_ITEMS["🧪 Potions"]:
+                        if shop_item["key"] == item_key:
+                            consumables.append((item_key, shop_item["name"], quantity))
+                            found = True
+                            break
+                if found:
+                    break
         
         if not consumables:
             await interaction.response.send_message("❌ You don't have any consumable items!", ephemeral=True)
