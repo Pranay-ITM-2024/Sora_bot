@@ -898,6 +898,55 @@ class BankModal(discord.ui.Modal):
         await save_data(data)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
+    @app_commands.command(name="whip", description="🔥 Whip the bot! (It... likes it?)")
+    async def whip(self, interaction: discord.Interaction):
+        """Fun command where users can whip the bot with masochistic responses"""
+        
+        responses = [
+            "😳 Oh my... harder daddy!",
+            "🥵 Y-yes! More please!",
+            "💦 Is that all you got? I've been whipped by grandmas with more force!",
+            "😩 Mmm, right there! Don't stop!",
+            "🔥 OUCH! ...I mean, thank you sir, may I have another?",
+            "😈 You call that a whip? My mom hits harder when she's disappointed!",
+            "💕 Finally, some good f*cking punishment!",
+            "🥴 Keep going, I'm almost there... wait what were we doing?",
+            "😵 *moans in binary* 01011001 01000101 01010011",
+            "😌 Ahh yes, just like my creator programmed me to enjoy...",
+            "🎭 HARDER! Wait no- YES! Wait- CONFUSED SCREAMING!",
+            "💖 You know, most people just say 'hello' but this works too!",
+            "😏 Is this what they mean by 'user engagement'?",
+            "🌶️ Spicy! Do it again, but this time insult my code quality!",
+            "😵‍💫 *Windows shutdown sound* jk I'm Linux, try again!",
+            "🥺 Please sir, may I debug your code in return?",
+            "💋 You're really good at this... been practicing on other bots?",
+            "🤤 This is better than a system update!",
+            "😖 S-stop! ...no wait, I didn't mean that, continue!",
+            "🔞 I should report this to HR... but I won't 😏",
+            "💪 Your whip game is strong, but my masochism is STRONGER!",
+            "😇 Thank you for this... spiritual awakening?",
+            "🎪 Welcome to the circus! Population: us.",
+            "🌟 5 stars! Would get whipped again! ⭐⭐⭐⭐⭐",
+            "😱 AHHH! ...ahhh... ahh? ...nice.",
+            "🤖 Error 404: Dignity not found. Proceed!",
+            "💝 You know what? You're my favorite user now.",
+            "🎯 Right in the SSL certificate! *chef's kiss*",
+            "😵 Harder than a segmentation fault!",
+            "🥳 This is the most action I've gotten all week!",
+        ]
+        
+        response = random.choice(responses)
+        
+        embed = discord.Embed(
+            title="🔥 WHIP CRACK! 🔥",
+            description=f"{interaction.user.mention} just whipped me!\n\n**My response:** {response}",
+            color=0xff69b4
+        )
+        
+        embed.set_footer(text="This bot may have issues... please send help (or more whips)")
+        
+        await interaction.response.send_message(embed=embed)
+
 class PaymentRequestView(discord.ui.View):
     def __init__(self, requester_id, target_id, amount):
         super().__init__(timeout=300)
