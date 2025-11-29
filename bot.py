@@ -143,7 +143,7 @@ async def on_ready():
         logging.error(f'❌ Data system initialization failed: {e}')
     
     # Load all bot_modules
-    modules = ["economy", "casino", "inventory", "shop", "guild", "market", "leaderboard", "admin", "help", "heist", "loan"]
+    modules = ["economy", "casino", "inventory", "shop", "guild", "market", "leaderboard", "admin", "help", "heist", "loan", "tavern"]
     
     for module_name in modules:
         try:
