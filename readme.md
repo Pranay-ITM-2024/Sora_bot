@@ -234,7 +234,7 @@ Contributions are welcome! Please feel free to submit pull requests or open issu
 
 ## 📞 Support
 
-For support, please open an issue on GitHub or contact the bot developer.
+For support, please open an issue on GitHub or contact the bot developer @pranaykadammcu@gmail.com.
 
 ---
 
